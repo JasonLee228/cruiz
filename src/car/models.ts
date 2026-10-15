@@ -221,11 +221,15 @@ export function buildCar(spec: CarSpec): CarModel {
     root.add(stripe);
   }
 
-  const wheelGeo = new THREE.CylinderGeometry(w.r, w.r, w.width, 28).rotateZ(Math.PI / 2);
-  // 바퀴는 매끈하게 음영을 줘야 굴러갈 때 각져 보이지 않는다
+  // 타이어는 도넛(토러스) 모양으로 옆면까지 둥글게, 휠은 촘촘한 원판으로 만든다.
+  // 매끈한 음영 + 48분할이면 화면에서는 완전한 원으로 보인다.
+  const tube = w.r * 0.3;
+  const wheelGeo = new THREE.TorusGeometry(w.r - tube, tube, 12, 48).rotateY(Math.PI / 2).scale(w.width / (tube * 2), 1, 1);
   const wheelMat = new THREE.MeshLambertMaterial({ color: '#2b2733' });
-  const capGeo = new THREE.CylinderGeometry(w.r * 0.55, w.r * 0.55, w.width + 0.02, 20).rotateZ(Math.PI / 2);
+  const capGeo = new THREE.CylinderGeometry(w.r - tube * 0.9, w.r - tube * 0.9, w.width * 0.7, 48).rotateZ(Math.PI / 2);
   const capMat = new THREE.MeshLambertMaterial({ color: '#d9dce8' });
+  const hubGeo = new THREE.CylinderGeometry(w.r * 0.18, w.r * 0.18, w.width * 0.8, 16).rotateZ(Math.PI / 2);
+  const hubMat = new THREE.MeshLambertMaterial({ color: '#8d8a99' });
   const wheels: THREE.Mesh[] = [];
   for (const [x, z] of [[-w.x, w.zFront], [w.x, w.zFront], [-w.x, w.zRear], [w.x, w.zRear]]) {
     const wm = new THREE.Mesh(wheelGeo, wheelMat);
@@ -233,6 +237,7 @@ export function buildCar(spec: CarSpec): CarModel {
     wm.castShadow = true;
     // 조향(y) 후에 회전(x)이 적용되도록 순서를 바꾼다. 기본 순서면 핸들을 꺾을 때 바퀴축이 흔들린다.
     wm.rotation.order = 'YXZ';
+    wm.add(new THREE.Mesh(hubGeo, hubMat));
     const cap = new THREE.Mesh(capGeo, capMat);
     wm.add(cap);
     root.add(wm);

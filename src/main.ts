@@ -25,6 +25,28 @@ const input = new Input(canvas);
 const post = createPost(renderer, scene, rig.camera);
 const quality = new Quality(renderer, post, sky.sun);
 
+// FPS 표시 (설정에서 켜고 끈다, 켠 상태는 저장)
+const fpsBox = document.getElementById('fps')!;
+const fpsToggle = document.getElementById('opt-fps') as HTMLInputElement;
+const FPS_KEY = 'cruiz.showFps';
+try { fpsToggle.checked = localStorage.getItem(FPS_KEY) === '1'; } catch { /* 무시 */ }
+fpsBox.hidden = !fpsToggle.checked;
+fpsToggle.addEventListener('change', () => {
+  fpsBox.hidden = !fpsToggle.checked;
+  try { localStorage.setItem(FPS_KEY, fpsToggle.checked ? '1' : '0'); } catch { /* 무시 */ }
+});
+const QUALITY_LABEL = { high: '높음', medium: '중간', low: '낮음' } as const;
+let fpsFrames = 0;
+let fpsTime = 0;
+function updateFps(raw: number): void {
+  fpsFrames++;
+  fpsTime += raw;
+  if (fpsTime < 0.5) return;
+  if (!fpsBox.hidden) fpsBox.textContent = `${Math.round(fpsFrames / fpsTime)} fps · 화질 ${QUALITY_LABEL[quality.level]}`;
+  fpsFrames = 0;
+  fpsTime = 0;
+}
+
 const hud = document.getElementById('hud')!;
 const hudSpeed = document.getElementById('hud-speed')!;
 const hudDistance = document.getElementById('hud-distance')!;
@@ -98,6 +120,7 @@ function frame(): void {
   const raw = clock.getDelta();
   const dt = Math.min(raw, 1 / 20);
   quality.update(raw);
+  updateFps(raw);
   elapsed += dt;
 
   if (started) input.update();

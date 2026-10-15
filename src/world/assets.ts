@@ -15,6 +15,10 @@ export interface Variant {
   part: Uint8Array;
   height: number;
   tris: number;
+  /** 정점 색이 미리 정해진 모델(절벽 등). 있으면 재질 구분 대신 이 색을 쓴다 */
+  color?: Float32Array;
+  /** 바닥 기준 가장 먼 수평 거리 (모델 단위) */
+  radius?: number;
 }
 
 export interface ScenerySet {

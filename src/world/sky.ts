@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mulberry32 } from './random';
 
 /** 하루 한 바퀴 (초). 4분이면 노을과 밤을 금방 만난다. */
 const DAY_LENGTH = 240;
@@ -24,6 +25,57 @@ const MOODS: Mood[] = [
   { sky: '#8a78c0', top: '#2b2c66', fog: '#6c5ea6', sun: '#d2bfff', sunIntensity: 0.8, ambient: 1.1, night: 0.7 }, // 새벽
 ];
 
+const FAR_ROCK = { low: new THREE.Color('#8e9dcc'), high: new THREE.Color('#b9c4e6') };
+const NEAR_HILL = { low: new THREE.Color('#7fa48e'), high: new THREE.Color('#a3c19b') };
+const SNOW = new THREE.Color('#f7f9ff');
+
+/**
+ * 각진 산 하나. 원뿔을 울퉁불퉁하게 비틀고, 면마다 높이에 따라 색을 칠한다 (높은 산은 꼭대기가 눈).
+ * 바닥은 수평선 아래(-25)에 묻는다.
+ */
+function mountain(
+  rand: () => number, x: number, z: number, radius: number, height: number, snow: boolean,
+  tone: { low: THREE.Color; high: THREE.Color },
+): THREE.BufferGeometry {
+  const sides = 7 + Math.floor(rand() * 3);
+  const g = new THREE.ConeGeometry(radius, height, sides, 3);
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  const moved = new Map<string, [number, number, number]>();
+  const leanX = (rand() - 0.5) * radius * 0.35;
+  const leanZ = (rand() - 0.5) * radius * 0.35;
+  for (let i = 0; i < pos.count; i++) {
+    const px = pos.getX(i), py = pos.getY(i), pz = pos.getZ(i);
+    const key = `${px.toFixed(2)},${py.toFixed(2)},${pz.toFixed(2)}`;
+    let m = moved.get(key);
+    if (!m) {
+      const t = py / height + 0.5; // 0 바닥 .. 1 꼭대기
+      const k = 0.75 + rand() * 0.5;
+      // 꼭대기 쪽은 한쪽으로 기울여 비대칭 능선을 만든다
+      m = [px * k + leanX * t, py + (t > 0 && t < 1 ? (rand() - 0.5) * height * 0.08 : 0), pz * k + leanZ * t];
+      moved.set(key, m);
+    }
+    pos.setXYZ(i, m[0], m[1], m[2]);
+  }
+  const flat = g.toNonIndexed();
+  g.dispose();
+  flat.translate(x, height / 2 - 25, z);
+  flat.computeVertexNormals();
+  const p = flat.attributes.position as THREE.BufferAttribute;
+  const n = flat.attributes.normal as THREE.BufferAttribute;
+  const colors = new Float32Array(p.count * 3);
+  const c = new THREE.Color();
+  for (let f = 0; f < p.count; f += 3) {
+    const cy = (p.getY(f) + p.getY(f + 1) + p.getY(f + 2)) / 3;
+    const t = THREE.MathUtils.clamp((cy + 25) / height, 0, 1);
+    const up = n.getY(f);
+    if (snow && t > 0.62 + (1 - up) * 0.15) c.copy(SNOW);
+    else c.copy(tone.low).lerp(tone.high, t).multiplyScalar(0.92 + rand() * 0.12);
+    for (let k = 0; k < 3; k++) c.toArray(colors, (f + k) * 3);
+  }
+  flat.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return flat;
+}
+
 export class Sky {
   readonly sun = new THREE.DirectionalLight('#ffffff', 2.5);
   readonly hemi = new THREE.HemisphereLight('#ffffff', '#8fb27a', 1);
@@ -46,7 +98,7 @@ export class Sky {
     sunDir: { value: new THREE.Vector3(0.1, 0.2, -1) },
     glowAmount: { value: 0 },
   };
-  private mountainMaterial!: THREE.MeshLambertMaterial;
+  private haze = { value: new THREE.Color() };
 
   constructor(scene: THREE.Scene, startTime = 0.08) {
     this.time = startTime;
@@ -104,26 +156,42 @@ export class Sky {
   }
 
   private buildMountains(): void {
-    // 산과 눈덮인 꼭대기를 각각 한 메쉬로 합쳐 그리기 호출을 줄인다
-    this.mountainMaterial = new THREE.MeshLambertMaterial({ color: '#a7b6dc', flatShading: true, fog: false });
-    const snow = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true, fog: false });
-    const peaks: THREE.BufferGeometry[] = [];
-    const caps: THREE.BufferGeometry[] = [];
-    for (let i = 0; i < 30; i++) {
-      const a = (i / 30) * Math.PI * 2 + Math.random() * 0.2;
-      const h = 70 + Math.random() * 130;
-      const r = 70 + Math.random() * 70;
-      const sides = 5 + Math.floor(Math.random() * 3);
-      const rot = Math.random() * Math.PI;
-      const x = Math.cos(a) * 780;
-      const z = Math.sin(a) * 780;
-      peaks.push(new THREE.ConeGeometry(r, h, sides).rotateY(rot).translate(x, h / 2 - 25, z).toNonIndexed());
-      if (h > 120) {
-        caps.push(new THREE.ConeGeometry(r * 0.3 * 1.06, h * 0.3 * 1.02, sides).rotateY(rot).translate(x, h - 25 - h * 0.15, z).toNonIndexed());
-      }
+    // 먼 산맥(푸른빛, 눈 덮인 봉우리)과 그 앞 낮은 언덕 두 겹. 겹마다 한 메쉬로 합친다.
+    const rand = mulberry32(4242);
+    const far: THREE.BufferGeometry[] = [];
+    const near: THREE.BufferGeometry[] = [];
+    for (let i = 0; i < 28; i++) {
+      const a = (i / 28) * Math.PI * 2 + rand() * 0.15;
+      const h = 70 + rand() * 90;
+      far.push(mountain(rand, Math.cos(a) * 820, Math.sin(a) * 820, 110 + rand() * 80, h, h > 120, FAR_ROCK));
     }
-    this.mountains.add(new THREE.Mesh(mergeGeometries(peaks), this.mountainMaterial));
-    if (caps.length) this.mountains.add(new THREE.Mesh(mergeGeometries(caps), snow));
+    // 정면 오른쪽(해 옆)에 시안처럼 크게 솟은 설산 하나
+    far.push(mountain(rand, 420, -900, 330, 210, true, FAR_ROCK));
+    for (let i = 0; i < 22; i++) {
+      const a = (i / 22) * Math.PI * 2 + rand() * 0.2;
+      const r = 540 + rand() * 60;
+      near.push(mountain(rand, Math.cos(a) * r, Math.sin(a) * r, 90 + rand() * 70, 45 + rand() * 45, false, NEAR_HILL));
+    }
+    this.mountains.add(
+      new THREE.Mesh(mergeGeometries(far), this.hazeMaterial(0.42)),
+      new THREE.Mesh(mergeGeometries(near), this.hazeMaterial(0.3)),
+    );
+    far.forEach((g) => g.dispose());
+    near.forEach((g) => g.dispose());
+  }
+
+  /** 정점 색에 하늘(안개)빛을 일정 비율 섞는 재질. 멀수록 많이 섞어 공기 원근감을 낸다. */
+  private hazeMaterial(amount: number): THREE.MeshLambertMaterial {
+    const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: false });
+    m.onBeforeCompile = (shader) => {
+      shader.uniforms.hazeColor = this.haze;
+      shader.uniforms.hazeAmount = { value: amount };
+      shader.fragmentShader = 'uniform vec3 hazeColor;\nuniform float hazeAmount;\n' + shader.fragmentShader.replace(
+        '#include <dithering_fragment>',
+        'gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeColor, hazeAmount);\n#include <dithering_fragment>',
+      );
+    };
+    return m;
   }
 
   private buildClouds(): void {
@@ -199,7 +267,7 @@ export class Sky {
     this.domeUniforms.glow.value.copy(this.sun.color);
     this.domeUniforms.glowAmount.value = 0.5 * (1 - Math.max(elev, 0) * 0.6) * (this.night > 0.8 ? 0.3 : 1);
     this.domeUniforms.sunDir.value.set(120, this.sunDisc.position.y, -760);
-    this.mountainMaterial.color.set('#a7b6dc').lerp(this.fog.color, 0.45);
+    this.haze.value.copy(this.fog.color);
     this.dome.position.set(focus.x, 0, focus.z);
     this.sunDisc.lookAt(focus.x, this.sunDisc.position.y, focus.z + 400);
 

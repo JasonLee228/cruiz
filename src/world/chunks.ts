@@ -5,6 +5,7 @@ import { mulberry32 } from './random';
 import { BARK, LEAF, scenery, type Variant } from './assets';
 
 const CHUNK_LENGTH = 80;
+const CHUNKS_AHEAD = 7;
 const CHUNKS_BEHIND = 2;
 const TERRAIN_HALF_WIDTH = 220;
 const TERRAIN_COLS = 44;
@@ -217,7 +218,7 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
     if (y < waterY(z) + 1) return; // 물 속에는 심지 않는다
     items.push({ x, y, z, scale, rot: rand() * Math.PI * 2, kind });
   };
-  for (let i = 0; i < 64; i++) {
+  for (let i = 0; i < 80; i++) {
     const z = z0 - rand() * CHUNK_LENGTH;
     const side = rand() < 0.85 ? -1 : 1; // 왼쪽 숲이 더 빽빽, 오른쪽은 바다가 보이도록 듬성듬성
     const offset = ROAD_HALF_WIDTH + (side < 0 ? 6 : 14) + Math.pow(rand(), 1.5) * 140;
@@ -252,7 +253,6 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
     });
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    mesh.userData.cat = 'trees';
     group.add(mesh);
   };
   const cliffs = by('cliff');
@@ -267,7 +267,6 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
     near.receiveShadow = true;
     const distant = mergeScenery(rest.filter(far), rand, true);
     distant.receiveShadow = true;
-    near.userData.cat = distant.userData.cat = 'trees';
     group.add(near, distant);
   } else {
     // 에셋을 못 받았을 때 쓰는 코드 생성 모양
@@ -374,7 +373,6 @@ function buildWater(group: THREE.Group, z0: number): void {
   g.computeVertexNormals();
   const mesh = new THREE.Mesh(g, waterMaterial);
   mesh.receiveShadow = true;
-  mesh.userData.cat = 'water';
   group.add(mesh);
 }
 
@@ -397,7 +395,6 @@ function buildVillage(group: THREE.Group, z0: number, rand: () => number): void 
     house.add(body, roof);
     house.position.set(x, y, z);
     house.rotation.y = rand() * Math.PI;
-        house.userData.cat = 'props';
         group.add(house);
   }
 }
@@ -420,7 +417,6 @@ function buildLighthouse(group: THREE.Group, z0: number, rand: () => number): vo
   cap.position.y = 22.4;
   light.add(rock, tower, band, lamp, cap);
   light.position.set(x, wl + 1.5, z);
-  light.userData.cat = 'props';
   group.add(light);
 }
 
@@ -437,7 +433,6 @@ function buildBoats(group: THREE.Group, z0: number, rand: () => number): void {
     boat.position.set(x, waterY(z) + 0.2, z);
     boat.rotation.y = rand() * Math.PI;
     boat.scale.setScalar(1.6 + rand() * 1.4);
-    boat.userData.cat = 'props';
     group.add(boat);
   }
 }
@@ -466,12 +461,10 @@ function buildRoadside(group: THREE.Group, z0: number, z1: number): void {
       posts.setMatrixAt(i * 2 + k, m);
     });
   });
-  posts.userData.cat = 'road';
   group.add(posts);
   const railMesh = new THREE.Mesh(mergeGeometries(rails), railMaterial);
   rails.forEach((g) => g.dispose());
   railMesh.castShadow = true;
-  railMesh.userData.cat = 'road';
   group.add(railMesh);
 
   // 커브가 심하면 노란 다이아몬드 표지판, 일정 간격으로 가로등
@@ -484,7 +477,6 @@ function buildRoadside(group: THREE.Group, z0: number, z1: number): void {
   const lampGlow = new THREE.Mesh(lampGlowGeometry, lampGlowMaterial);
   lampGlow.position.copy(lampBase);
   lampPole.userData.shared = lampGlow.userData.shared = true;
-  lampPole.userData.cat = lampGlow.userData.cat = 'road';
   group.add(lampPole, lampGlow);
 
   const curve = Math.abs(roadDX(z0 - 40) - roadDX(z0));
@@ -497,7 +489,6 @@ function buildRoadside(group: THREE.Group, z0: number, z1: number): void {
     sign.position.copy(base);
     sign.rotation.y = Math.atan(-roadDX(z0 - 10)) + Math.PI;
     pole.userData.shared = sign.userData.shared = true;
-    pole.userData.cat = sign.userData.cat = 'road';
     group.add(pole, sign);
   }
 }
@@ -512,12 +503,10 @@ class Chunk {
 
     const terrain = new THREE.Mesh(buildTerrain(z0, rand), terrainMaterial);
     terrain.receiveShadow = true;
-    terrain.userData.cat = 'terrain';
     this.group.add(terrain);
 
     const road = new THREE.Mesh(ribbon(z0, z1, -ROAD_HALF_WIDTH, ROAD_HALF_WIDTH, 0.02), roadMaterial);
     road.receiveShadow = true;
-    road.userData.cat = 'road';
     this.group.add(road);
     // 중앙 점선과 양쪽 실선을 한 메쉬로
     const lines = [
@@ -525,9 +514,7 @@ class Chunk {
       ribbon(z0, z1, -ROAD_HALF_WIDTH + 0.3, -ROAD_HALF_WIDTH + 0.5, 0.04),
       ribbon(z0, z1, ROAD_HALF_WIDTH - 0.5, ROAD_HALF_WIDTH - 0.3, 0.04),
     ];
-    const lineMesh = new THREE.Mesh(mergeGeometries(lines), lineMaterial);
-    lineMesh.userData.cat = 'road';
-    this.group.add(lineMesh);
+    this.group.add(new THREE.Mesh(mergeGeometries(lines), lineMaterial));
     lines.forEach((g) => g.dispose());
 
     buildRoadside(this.group, z0, z1);
@@ -545,15 +532,13 @@ class Chunk {
 /** 차 앞쪽으로 청크를 만들고, 지나간 청크는 버린다. 메모리는 항상 일정하다. */
 export class ChunkManager {
   private chunks = new Map<number, Chunk>();
-  /** 앞쪽으로 만들어 둘 청크 수 (시야 거리). 화질 단계에 따라 바뀐다. */
-  ahead = 7;
 
   constructor(private scene: THREE.Scene) {}
 
   update(carZ: number): void {
     const current = Math.floor(-carZ / CHUNK_LENGTH);
     const min = current - CHUNKS_BEHIND;
-    const max = current + this.ahead;
+    const max = current + CHUNKS_AHEAD;
 
     for (const [index, chunk] of this.chunks) {
       if (index < min || index > max) {

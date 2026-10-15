@@ -7,12 +7,10 @@ import { loadScenery } from './world/assets';
 import { Sky } from './world/sky';
 import { loadCarId, mountCarPicker } from './ui/carPicker';
 import { createPost } from './post';
-import { Quality, initialLevel } from './quality';
-import { applyDebug, debugEnabled, mountDebugPanel } from './debug';
+import { Quality } from './quality';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
-// 낮음 화질로 저장돼 있으면 MSAA 없이 시작한다 (내장 그래픽에서 부담이 큼)
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: initialLevel() !== 'low' });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
@@ -26,40 +24,28 @@ scene.add(car.object);
 const rig = new CameraRig();
 const input = new Input(canvas);
 const post = createPost(renderer, scene, rig.camera);
-const quality = new Quality(renderer, post, sky.sun, world, sky.fog);
+const quality = new Quality(renderer, post, sky.sun);
 
 // FPS 표시 (설정에서 켜고 끈다, 켠 상태는 저장)
 const fpsBox = document.getElementById('fps')!;
 const fpsToggle = document.getElementById('opt-fps') as HTMLInputElement;
 const FPS_KEY = 'cruiz.showFps';
 try { fpsToggle.checked = localStorage.getItem(FPS_KEY) === '1'; } catch { /* 무시 */ }
-fpsBox.hidden = !fpsToggle.checked && !debugEnabled;
+fpsBox.hidden = !fpsToggle.checked;
 fpsToggle.addEventListener('change', () => {
   fpsBox.hidden = !fpsToggle.checked;
   try { localStorage.setItem(FPS_KEY, fpsToggle.checked ? '1' : '0'); } catch { /* 무시 */ }
 });
 const QUALITY_LABEL = { high: '높음', medium: '중간', low: '낮음' } as const;
-// 그래픽 가속이 꺼져 소프트웨어로 그리는 경우(SwiftShader 등) FPS 옆에 알려 준다
-const GPU_NAME = (() => {
-  const gl = renderer.getContext();
-  const ext = gl.getExtension('WEBGL_debug_renderer_info');
-  return ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
-})();
-const SOFTWARE_GPU = /swiftshader|llvmpipe|software|basic render/i.test(GPU_NAME);
-// 'ANGLE (Intel, Intel(R) UHD Graphics 620 Direct3D11 ...)' → 'Intel(R) UHD Graphics 620'
-const GPU_SHORT = (GPU_NAME.match(/ANGLE \([^,]*, ([^,(]*(?:\([^)]*\)[^,(]*)*)/)?.[1] ?? GPU_NAME).replace(/^ANGLE \w+ Renderer: /, '').replace(/ (Direct3D|OpenGL|Vulkan|Metal).*$/, '').trim();
-fpsBox.title = GPU_NAME;
 let fpsFrames = 0;
 let fpsTime = 0;
-let cpuTime = 0; // 한 프레임에서 자바스크립트(CPU)가 쓴 시간 합. 프레임 시간과 비슷하면 CPU가 병목
 function updateFps(raw: number): void {
   fpsFrames++;
   fpsTime += raw;
   if (fpsTime < 0.5) return;
-  if (!fpsBox.hidden) fpsBox.textContent = `${Math.round(fpsFrames / fpsTime)} fps · CPU ${(cpuTime / fpsFrames).toFixed(1)}ms · 화질 ${QUALITY_LABEL[quality.level]}${SOFTWARE_GPU ? ' · 그래픽 가속 꺼짐' : GPU_SHORT ? ` · ${GPU_SHORT}` : ''}`;
+  if (!fpsBox.hidden) fpsBox.textContent = `${Math.round(fpsFrames / fpsTime)} fps · 화질 ${QUALITY_LABEL[quality.level]}`;
   fpsFrames = 0;
   fpsTime = 0;
-  cpuTime = 0;
 }
 
 const hud = document.getElementById('hud')!;
@@ -132,7 +118,6 @@ const clock = new THREE.Clock();
 let elapsed = 0;
 
 function frame(): void {
-  const cpuStart = performance.now();
   const raw = clock.getDelta();
   const dt = Math.min(raw, 1 / 20);
   quality.update(raw);
@@ -153,14 +138,9 @@ function frame(): void {
   post.setNight(sky.night);
   // 차선은 조명을 받지 않는 재질이라, 밤에는 직접 어둡게 해 과하게 번지지 않게 한다
   lineMaterial.color.setScalar(0.9 * (1 - sky.night * 0.5));
-  applyDebug(scene, car.object);
   post.render(dt);
-  cpuTime += performance.now() - cpuStart;
-  // 자연 에셋(약 300KB)을 먼저 받고 시작한다. 실패해도 기본 모양으로 이어진다.
-loadScenery().finally(() => requestAnimationFrame(frame));
+  requestAnimationFrame(frame);
 }
-
-mountDebugPanel();
 
 // 테스트·스크린샷용 훅
 (window as unknown as { cruiz: unknown }).cruiz = { car, sky, rig, start, quality, renderer };

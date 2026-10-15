@@ -3,6 +3,7 @@ import { Car } from './car/car';
 import { CameraRig } from './car/camera';
 import { Input } from './input';
 import { ChunkManager, lineMaterial } from './world/chunks';
+import { loadScenery } from './world/assets';
 import { Sky } from './world/sky';
 import { loadCarId, mountCarPicker } from './ui/carPicker';
 import { createPost } from './post';
@@ -138,10 +139,12 @@ function frame(): void {
   // 차선은 조명을 받지 않는 재질이라, 밤에는 직접 어둡게 해 과하게 번지지 않게 한다
   lineMaterial.color.setScalar(0.9 * (1 - sky.night * 0.5));
   post.render(dt);
-  requestAnimationFrame(frame);
+  // 자연 에셋(약 300KB)을 먼저 받고 시작한다. 실패해도 기본 모양으로 이어진다.
+loadScenery().finally(() => requestAnimationFrame(frame));
 }
 
 // 테스트·스크린샷용 훅
 (window as unknown as { cruiz: unknown }).cruiz = { car, sky, rig, start, quality, renderer };
 
-requestAnimationFrame(frame);
+// 자연 에셋(약 300KB)을 먼저 받고 시작한다. 실패해도 기본 모양으로 이어진다.
+loadScenery().finally(() => requestAnimationFrame(frame));

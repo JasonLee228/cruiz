@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ROAD_HALF_WIDTH, roadDX, roadX, roadY, terrainY, waterY } from './path';
 import { mulberry32 } from './random';
+import { BARK, LEAF, scenery, type Variant } from './assets';
 
 const CHUNK_LENGTH = 80;
 const CHUNKS_AHEAD = 7;
@@ -81,6 +82,13 @@ const signPoleGeometry = new THREE.CylinderGeometry(0.06, 0.06, 2, 5).translate(
 const lampPoleGeometry = new THREE.CylinderGeometry(0.07, 0.1, 5.4, 5).translate(0, 2.7, 0);
 const lampGlowGeometry = new THREE.IcosahedronGeometry(0.3, 0).translate(0, 5.5, 0);
 const rockGeometry = new THREE.DodecahedronGeometry(1, 0);
+
+const BARK_COLOR = new THREE.Color('#8a6246');
+const STONE_COLOR = new THREE.Color('#c9c2d4');
+// 에셋 높이를 월드 높이로 맞춘다 (기존 나무 한 그루 크기 기준)
+const ASSET_HEIGHT = { pine: 5.6, round: 4.8, bush: 1.2 } as const;
+const ASSET_ROCK_SCALE = 3.2;
+const assetMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 
 const PINE_COLORS = ['#4fae78', '#5cbd82', '#3f9a6c'].map((c) => new THREE.Color(c));
 const LEAF_COLORS = ['#7ad183', '#66c47a', '#92dc86', '#52b872', '#f4c26b', '#f2a07b'].map((c) => new THREE.Color(c));
@@ -194,8 +202,8 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
   const p = new THREE.Vector3();
   const up = new THREE.Vector3(0, 1, 0);
 
-  type Kind = 'pine' | 'round' | 'rock' | 'bush' | 'cliff';
-  type Item = { x: number; y: number; z: number; scale: number; rot: number; kind: Kind };
+  type Kind = SceneryItem['kind'];
+  type Item = SceneryItem;
   const items: Item[] = [];
   const add = (z: number, x: number, scale: number, kind: Kind) => {
     const y = terrainY(x, z);
@@ -226,8 +234,6 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
   }
 
   const by = (k: Kind) => items.filter((it) => it.kind === k);
-  const trees = items.filter((it) => it.kind === 'pine' || it.kind === 'round');
-  const trunks = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, trees.length);
   const place = (mesh: THREE.InstancedMesh, list: Item[], palette?: THREE.Color[], extraScale = 1, sink = 0) => {
     list.forEach((it, i) => {
       q.setFromAxisAngle(up, it.rot);
@@ -241,22 +247,97 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
     mesh.receiveShadow = true;
     group.add(mesh);
   };
-  const pines = by('pine');
-  const rounds = by('round');
-  const bushes = by('bush');
-  const rocks = by('rock');
   const cliffs = by('cliff');
-  place(trunks, trees);
-  place(new THREE.InstancedMesh(pineGeometry, leafMaterial, pines.length), pines, PINE_COLORS);
-  place(new THREE.InstancedMesh(roundTreeGeometry, leafMaterial, rounds.length), rounds, LEAF_COLORS);
-  place(new THREE.InstancedMesh(bushGeometry, leafMaterial, bushes.length), bushes, LEAF_COLORS);
-  place(new THREE.InstancedMesh(rockGeometry, rockMaterial, rocks.length), rocks, undefined, 1.3, 0.3);
   place(new THREE.InstancedMesh(rockGeometry, cliffMaterial, cliffs.length), cliffs, [CLIFF, CLIFF.clone().offsetHSL(0, 0, 0.04)], 1, 1.5);
+
+  if (scenery) {
+    // 한 청크의 나무·바위·덤불을 메쉬 하나로 합쳐 그리기 호출을 1번으로 줄인다
+    const merged = mergeScenery(items.filter((it) => it.kind !== 'cliff'), rand);
+    merged.castShadow = true;
+    merged.receiveShadow = true;
+    group.add(merged);
+  } else {
+    // 에셋을 못 받았을 때 쓰는 코드 생성 모양
+    const trees = items.filter((it) => it.kind === 'pine' || it.kind === 'round');
+    const pines = by('pine');
+    const rounds = by('round');
+    const bushes = by('bush');
+    const rocks = by('rock');
+    place(new THREE.InstancedMesh(trunkGeometry, trunkMaterial, trees.length), trees);
+    place(new THREE.InstancedMesh(pineGeometry, leafMaterial, pines.length), pines, PINE_COLORS);
+    place(new THREE.InstancedMesh(roundTreeGeometry, leafMaterial, rounds.length), rounds, LEAF_COLORS);
+    place(new THREE.InstancedMesh(bushGeometry, leafMaterial, bushes.length), bushes, LEAF_COLORS);
+    place(new THREE.InstancedMesh(rockGeometry, rockMaterial, rocks.length), rocks, undefined, 1.3, 0.3);
+  }
 
   buildWater(group, z0);
   if (index % 5 === 2) buildVillage(group, z0, rand);
   if (index % 9 === 4) buildLighthouse(group, z0, rand);
   buildBoats(group, z0, rand);
+}
+
+type SceneryItem = { x: number; y: number; z: number; scale: number; rot: number; kind: 'pine' | 'round' | 'rock' | 'bush' | 'cliff' };
+
+/** 에셋을 청크 단위 정적 메쉬 하나로 합친다. 색은 정점에 구워 넣는다. */
+function mergeScenery(items: SceneryItem[], rand: () => number): THREE.Mesh {
+  const set = scenery!;
+  const chosen = items.map((it) => {
+    const list: Variant[] = it.kind === 'pine' ? set.pines : it.kind === 'round' ? set.roundTrees : it.kind === 'bush' ? set.bushes : set.rocks;
+    return { it, v: list[Math.floor(rand() * list.length)] };
+  });
+  let verts = 0;
+  let idx = 0;
+  for (const { v } of chosen) { verts += v.part.length; idx += v.index.length; }
+  const position = new Float32Array(verts * 3);
+  const normal = new Float32Array(verts * 3);
+  const color = new Float32Array(verts * 3);
+  const index = new Uint32Array(idx);
+  const tint = new THREE.Color();
+  let vo = 0;
+  let io = 0;
+  for (const { it, v } of chosen) {
+    const k = it.kind === 'rock'
+      ? ASSET_ROCK_SCALE * it.scale
+      : (ASSET_HEIGHT[it.kind as 'pine' | 'round' | 'bush'] * it.scale) / v.height;
+    const c = Math.cos(it.rot);
+    const sn = Math.sin(it.rot);
+    const sink = it.kind === 'rock' ? 0.25 : 0;
+    const palette = it.kind === 'pine' ? PINE_COLORS : LEAF_COLORS;
+    // 단풍색(팔레트 뒤쪽 둘)은 가끔만 섞어 숲이 초록 위주로 보이게 한다
+    const leaf = palette[Math.floor(rand() * (rand() < 0.2 ? palette.length : Math.min(palette.length, 4)))];
+    const stoneShade = 0.88 + rand() * 0.2;
+    for (let i = 0; i < v.part.length; i++) {
+      const px = v.position[i * 3], py = v.position[i * 3 + 1], pz = v.position[i * 3 + 2];
+      const o = (vo + i) * 3;
+      position[o] = it.x + (c * px + sn * pz) * k;
+      position[o + 1] = it.y - sink + py * k;
+      position[o + 2] = it.z + (-sn * px + c * pz) * k;
+      const nx = v.normal[i * 3], nz = v.normal[i * 3 + 2];
+      normal[o] = c * nx + sn * nz;
+      normal[o + 1] = v.normal[i * 3 + 1];
+      normal[o + 2] = -sn * nx + c * nz;
+      const part = v.part[i];
+      if (part === LEAF) {
+        // 아래는 어둡고 위는 밝게: 기존 잎 덩어리와 같은 입체감
+        const t = Math.min(Math.max(py / v.height, 0), 1);
+        tint.copy(leaf).multiplyScalar(0.72 + t * 0.38);
+      } else if (part === BARK) tint.copy(BARK_COLOR);
+      else tint.copy(STONE_COLOR).multiplyScalar(stoneShade);
+      color[o] = tint.r;
+      color[o + 1] = tint.g;
+      color[o + 2] = tint.b;
+    }
+    for (let i = 0; i < v.index.length; i++) index[io + i] = v.index[i] + vo;
+    vo += v.part.length;
+    io += v.index.length;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(position, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(color, 3));
+  g.setIndex(new THREE.BufferAttribute(index, 1));
+  g.computeBoundingSphere();
+  return new THREE.Mesh(g, assetMaterial);
 }
 
 /** 오른쪽 바다. 도로를 따라 수면 높이가 오르내린다. */

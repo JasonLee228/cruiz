@@ -5,6 +5,7 @@ import { Input } from './input';
 import { ChunkManager, lineMaterial } from './world/chunks';
 import { loadScenery } from './world/assets';
 import { Sky } from './world/sky';
+import { Landmarks } from './world/landmarks';
 import { loadCarId, mountCarPicker } from './ui/carPicker';
 import { createPost } from './post';
 import { Quality } from './quality';
@@ -19,6 +20,7 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 const scene = new THREE.Scene();
 const sky = new Sky(scene);
 const world = new ChunkManager(scene);
+const landmarks = new Landmarks(scene);
 const car = new Car(loadCarId() ?? undefined);
 scene.add(car.object);
 const rig = new CameraRig();
@@ -131,6 +133,7 @@ function frame(): void {
   syncTheme();
   car.setNight(sky.night);
   rig.update(dt, car, elapsed);
+  landmarks.update(car.z, rig.camera.position, sky.fog.color, sky.night);
 
   hudSpeed.textContent = Math.round(car.speed * 3.6).toString();
   hudDistance.textContent = (car.distance / 1000).toFixed(1);

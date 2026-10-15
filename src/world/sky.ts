@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { mulberry32 } from './random';
+import { addHaze } from './haze';
 
 /** 하루 한 바퀴 (초). 4분이면 노을과 밤을 금방 만난다. */
 const DAY_LENGTH = 240;
@@ -183,15 +184,7 @@ export class Sky {
   /** 정점 색에 하늘(안개)빛을 일정 비율 섞는 재질. 멀수록 많이 섞어 공기 원근감을 낸다. */
   private hazeMaterial(amount: number): THREE.MeshLambertMaterial {
     const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: false });
-    m.onBeforeCompile = (shader) => {
-      shader.uniforms.hazeColor = this.haze;
-      shader.uniforms.hazeAmount = { value: amount };
-      shader.fragmentShader = 'uniform vec3 hazeColor;\nuniform float hazeAmount;\n' + shader.fragmentShader.replace(
-        '#include <dithering_fragment>',
-        'gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeColor, hazeAmount);\n#include <dithering_fragment>',
-      );
-    };
-    return m;
+    return addHaze(m, this.haze, { value: amount });
   }
 
   private buildClouds(): void {

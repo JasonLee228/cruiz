@@ -11,8 +11,8 @@ body {
 
 #start {
   position: fixed; inset: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; padding: 16px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 12px; padding: 6vh 16px 16px; text-align: center;
   background: linear-gradient(180deg, rgba(40, 30, 60, 0.15), rgba(40, 30, 60, 0.45));
   transition: opacity 0.6s ease;
 }
@@ -28,7 +28,7 @@ body {
   background: #ffe9a8; box-shadow: 0 5px 0 #d9a75b; cursor: pointer;
 }
 #start-button:active { transform: translateY(3px); box-shadow: 0 2px 0 #d9a75b; }
-.keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; list-style: none; padding: 0; margin: 16px 0 0; font-size: 14px; opacity: 0.85; }
+.keys { position: absolute; bottom: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; list-style: none; padding: 0; margin: 16px 0 0; font-size: 14px; opacity: 0.85; }
 kbd {
   display: inline-block; min-width: 22px; padding: 2px 6px; margin-right: 3px;
   border-radius: 6px; background: rgba(255, 255, 255, 0.2); font: inherit; font-size: 12px;
@@ -49,3 +49,12 @@ kbd {
 .stat small { font-size: 12px; opacity: 0.8; }
 .badge { padding: 6px 10px; border-radius: 10px; background: #ffe9a8; color: #3c2a50; font-weight: 700; font-size: 13px; }
 .badge[hidden] { display: none; }
+
+#car-picker { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
+.car-option {
+  display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 2px solid transparent;
+  border-radius: 999px; font: inherit; font-size: 15px; font-weight: 700; color: #fff; cursor: pointer;
+  background: rgba(40, 30, 60, 0.35);
+}
+.car-option i { width: 14px; height: 14px; border-radius: 4px; background: var(--c); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5); }
+.car-option[aria-checked='true'] { border-color: #ffe9a8; background: rgba(40, 30, 60, 0.65); }

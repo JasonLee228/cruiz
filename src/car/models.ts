@@ -6,8 +6,6 @@ type Style = 'sedan' | 'hatch' | 'sports' | 'suv' | 'van';
 export interface CarSpec {
   id: CarId;
   name: string;
-  /** 시작 화면 버튼에 쓰는 대표 색 */
-  swatch: string;
   style: Style;
   /** 차체 색, 윗부분(캐빈) 색(투톤일 때), 유리 색 */
   color: string;
@@ -30,7 +28,7 @@ export interface CarSpec {
 export const CARS: CarSpec[] = [
   {
     // 시안의 주인공 차 (기본 차종)
-    id: 'classic', name: '클래식', swatch: '#a6d8d4', style: 'sedan',
+    id: 'classic', name: 'Classic', style: 'sedan',
     color: '#a6d8d4', glass: '#41607c',
     length: 4.3, width: 1.86, bottom: 0.3,
     top: [[-2.15, 0.78], [-1.9, 0.9], [-0.8, 0.97], [1.25, 0.99], [2.15, 0.93]],
@@ -39,7 +37,7 @@ export const CARS: CarSpec[] = [
     maxSpeed: 33,
   },
   {
-    id: 'hatch', name: '해치백', swatch: '#e85d5d', style: 'hatch',
+    id: 'hatch', name: 'Hatchback', style: 'hatch',
     color: '#e85d5d', glass: '#41607c',
     length: 3.95, width: 1.8, bottom: 0.3,
     top: [[-1.98, 0.74], [-1.75, 0.87], [-0.7, 0.95], [1.98, 0.98]],
@@ -48,7 +46,7 @@ export const CARS: CarSpec[] = [
     maxSpeed: 33,
   },
   {
-    id: 'sports', name: '스포츠카', swatch: '#f2c14e', style: 'sports',
+    id: 'sports', name: 'Sports', style: 'sports',
     color: '#f2c14e', glass: '#2e3b4e',
     length: 4.5, width: 1.98, bottom: 0.24,
     top: [[-2.25, 0.54], [-1.95, 0.74], [-1.4, 0.8], [-0.55, 0.8], [1.3, 0.84], [2.25, 0.86]],
@@ -57,7 +55,7 @@ export const CARS: CarSpec[] = [
     maxSpeed: 44,
   },
   {
-    id: 'suv', name: 'SUV', swatch: '#e07a5f', style: 'suv',
+    id: 'suv', name: 'SUV', style: 'suv',
     color: '#e07a5f', glass: '#41607c',
     length: 4.4, width: 2.0, bottom: 0.55,
     top: [[-2.2, 1.05], [-1.95, 1.18], [-0.9, 1.25], [2.2, 1.28]],
@@ -66,7 +64,7 @@ export const CARS: CarSpec[] = [
     maxSpeed: 28,
   },
   {
-    id: 'van', name: '레트로 밴', swatch: '#7fb2e0', style: 'van',
+    id: 'van', name: 'Retro Van', style: 'van',
     color: '#7fb2e0', upper: '#f4f1e8', glass: '#3f5d7a',
     length: 4.3, width: 1.95, bottom: 0.38,
     top: [[-2.15, 1.04], [-1.95, 1.12], [2.15, 1.12]],

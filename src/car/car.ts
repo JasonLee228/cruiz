@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { ROAD_HALF_WIDTH, roadDX, roadDY, roadX, roadY } from '../world/path';
 import type { InputState } from '../input';
-import { buildCar, getSpec, type CarSpec } from './models';
+import { buildCar, getSpec, type CarModel, type CarSpec } from './models';
 
 const ACCEL = 7;
 const BRAKE = 12;
@@ -26,6 +26,8 @@ export class Car {
   headlight!: THREE.SpotLight;
   private tail!: THREE.MeshBasicMaterial;
   private model!: THREE.Group;
+  /** 한 번 만든 차는 보관해 두고, 다시 고를 때 그대로 꺼내 쓴다. */
+  private built = new Map<string, CarModel>();
 
   constructor(id?: string) {
     this.object = new THREE.Group();
@@ -35,16 +37,12 @@ export class Car {
 
   /** 차종을 바꾼다. 위치와 속도는 그대로 유지한다. */
   setType(spec: CarSpec): void {
-    if (this.model) {
-      this.object.remove(this.model);
-      this.model.traverse((o) => {
-        if (o instanceof THREE.Mesh) {
-          o.geometry.dispose();
-          (o.material as THREE.Material).dispose();
-        }
-      });
+    if (this.model) this.object.remove(this.model);
+    let m = this.built.get(spec.id);
+    if (!m) {
+      m = buildCar(spec);
+      this.built.set(spec.id, m);
     }
-    const m = buildCar(spec);
     this.model = m.root;
     this.object.add(m.root);
     this.wheels = m.wheels;

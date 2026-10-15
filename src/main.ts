@@ -86,7 +86,29 @@ settingsBtn.addEventListener('click', () => {
 // 소리는 아직 없다. 버튼은 자리만 잡아 두고 상태만 토글한다.
 soundBtn.addEventListener('click', () => soundBtn.setAttribute('aria-pressed', String(soundBtn.getAttribute('aria-pressed') !== 'true')));
 
-mountCarPicker(document.getElementById('car-picker')!, (spec) => car.setType(spec));
+// 차종 선택: 시작 화면과 주행 중 왼쪽 아래 패널이 같은 선택을 공유한다.
+const garage = document.getElementById('garage')!;
+const garageButton = document.getElementById('garage-button')!;
+const garagePanel = document.getElementById('garage-panel')!;
+const garageName = document.getElementById('garage-name')!;
+const picker = mountCarPicker([document.getElementById('car-picker')!, garagePanel], (spec) => {
+  car.setType(spec);
+  garageName.textContent = spec.name;
+});
+garageName.textContent = picker.current().name;
+function setGarageOpen(open: boolean): void {
+  garagePanel.hidden = !open;
+  garageButton.setAttribute('aria-expanded', String(open));
+}
+garageButton.addEventListener('click', () => setGarageOpen(garagePanel.hidden));
+window.addEventListener('pointerdown', (e) => {
+  if (!garagePanel.hidden && !(e.target as HTMLElement).closest('#garage')) setGarageOpen(false);
+});
+window.addEventListener('keydown', (e) => {
+  if (e.repeat || !started) return;
+  if (e.key.toLowerCase() === 'v') picker.next();
+  if (e.key === 'Escape') setGarageOpen(false);
+});
 
 input.onToggleCamera = () => rig.next();
 input.onToggleAutopilot = (on) => (hudMode.hidden = !on);
@@ -101,12 +123,13 @@ function start(): void {
   started = true;
   startScreen.classList.add('hidden');
   hud.hidden = false;
+  garage.hidden = false;
   input.state.autopilot = false;
   car.targetSpeed = 22;
 }
 startButton.addEventListener('click', start);
 window.addEventListener('keydown', (e) => {
-  if ((e.target as HTMLElement).closest?.('#car-picker')) return;
+  if ((e.target as HTMLElement).closest?.('.car-picker')) return;
   if (!started && (e.key.startsWith('Arrow') || (!(e.target instanceof HTMLButtonElement) && (e.key === 'Enter' || e.key === ' ')))) start();
 });
 

@@ -8,6 +8,7 @@ import { Sky } from './world/sky';
 import { loadCarId, mountCarPicker } from './ui/carPicker';
 import { createPost } from './post';
 import { Quality, initialLevel } from './quality';
+import { applyDebug, debugEnabled, mountDebugPanel } from './debug';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 // 낮음 화질로 저장돼 있으면 MSAA 없이 시작한다 (내장 그래픽에서 부담이 큼)
@@ -32,7 +33,7 @@ const fpsBox = document.getElementById('fps')!;
 const fpsToggle = document.getElementById('opt-fps') as HTMLInputElement;
 const FPS_KEY = 'cruiz.showFps';
 try { fpsToggle.checked = localStorage.getItem(FPS_KEY) === '1'; } catch { /* 무시 */ }
-fpsBox.hidden = !fpsToggle.checked;
+fpsBox.hidden = !fpsToggle.checked && !debugEnabled;
 fpsToggle.addEventListener('change', () => {
   fpsBox.hidden = !fpsToggle.checked;
   try { localStorage.setItem(FPS_KEY, fpsToggle.checked ? '1' : '0'); } catch { /* 무시 */ }
@@ -152,11 +153,14 @@ function frame(): void {
   post.setNight(sky.night);
   // 차선은 조명을 받지 않는 재질이라, 밤에는 직접 어둡게 해 과하게 번지지 않게 한다
   lineMaterial.color.setScalar(0.9 * (1 - sky.night * 0.5));
+  applyDebug(scene, car.object);
   post.render(dt);
   cpuTime += performance.now() - cpuStart;
   // 자연 에셋(약 300KB)을 먼저 받고 시작한다. 실패해도 기본 모양으로 이어진다.
 loadScenery().finally(() => requestAnimationFrame(frame));
 }
+
+mountDebugPanel();
 
 // 테스트·스크린샷용 훅
 (window as unknown as { cruiz: unknown }).cruiz = { car, sky, rig, start, quality, renderer };

@@ -88,6 +88,9 @@ export class Sky {
       }),
     );
     this.dome.renderOrder = -10;
+    this.dome.userData.cat = this.stars.userData.cat = this.sunDisc.userData.cat = 'sky';
+    this.mountains.userData.cat = 'mountains';
+    this.clouds.userData.cat = 'clouds';
     scene.add(this.dome, this.mountains, this.clouds, this.stars, this.sunDisc);
   }
 

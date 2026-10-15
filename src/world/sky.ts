@@ -35,6 +35,7 @@ export class Sky {
   private cloudMaterial = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true, fog: false });
   private mountains = new THREE.Group();
   private stars: THREE.Points;
+  private sunDisc: THREE.Mesh;
 
   constructor(scene: THREE.Scene, startTime = 0.08) {
     this.time = startTime;
@@ -52,7 +53,23 @@ export class Sky {
     this.buildMountains();
     this.buildClouds();
     this.stars = this.buildStars();
-    scene.add(this.mountains, this.clouds, this.stars);
+    this.sunDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 32),
+      new THREE.MeshBasicMaterial({ color: '#fff4c8', fog: false, depthWrite: false }),
+    );
+    scene.add(this.mountains, this.clouds, this.stars, this.sunDisc);
+  }
+
+  /** UI 테마용: 지금이 낮 / 노을 / 밤 중 어디인지 */
+  get phase(): 'day' | 'sunset' | 'night' {
+    const f = this.time * MOODS.length;
+    if (f >= 2 && f < 4) return 'sunset';
+    if (f >= 4 && f < 5.5) return 'night';
+    return 'day';
+  }
+
+  setPhase(phase: 'day' | 'sunset' | 'night'): void {
+    this.time = { day: 0.1, sunset: 0.37, night: 0.7 }[phase];
   }
 
   private buildMountains(): void {
@@ -122,6 +139,14 @@ export class Sky {
     const angle = this.time * Math.PI * 2;
     this.sun.position.set(focus.x + Math.cos(angle) * 80 + 40, focus.y + 90 + Math.sin(angle) * 30, focus.z + 50);
     this.sun.target.position.copy(focus);
+
+    // 해 원반: 낮에는 높이, 노을에는 수평선 근처에 걸린다.
+    const elev = Math.cos((this.time - 0.17) * Math.PI * 2);
+    this.sunDisc.visible = elev > -0.05;
+    this.sunDisc.position.set(focus.x + 120, Math.max(elev, -0.05) * 380 + 20, focus.z - 760);
+    this.sunDisc.scale.setScalar(55 + (1 - Math.max(elev, 0)) * 30);
+    (this.sunDisc.material as THREE.MeshBasicMaterial).color.copy(this.sun.color).lerp(new THREE.Color('#fff4c8'), 0.4);
+    this.sunDisc.lookAt(focus.x, this.sunDisc.position.y, focus.z + 400);
 
     // 먼 배경은 차를 따라다녀 끝없이 멀리 있는 것처럼 보인다.
     this.mountains.position.set(focus.x, 0, focus.z);

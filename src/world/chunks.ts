@@ -19,11 +19,20 @@ const roadMaterial = new THREE.MeshLambertMaterial({ color: '#4a4658' });
 const lineMaterial = new THREE.MeshBasicMaterial({ color: '#fff3d6' });
 const trunkMaterial = new THREE.MeshLambertMaterial({ color: '#7a5235', flatShading: true });
 const leafMaterial = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true });
+const railMaterial = new THREE.MeshLambertMaterial({ color: '#c9ccd6', flatShading: true, side: THREE.DoubleSide });
+const postMaterial = new THREE.MeshLambertMaterial({ color: '#8a8d9c', flatShading: true });
+const signMaterial = new THREE.MeshLambertMaterial({ color: '#f2c14e', flatShading: true });
+const lampGlowMaterial = new THREE.MeshBasicMaterial({ color: '#ffe3a0', fog: false });
 const rockMaterial = new THREE.MeshLambertMaterial({ color: '#9a96a6', flatShading: true });
 
 const trunkGeometry = new THREE.CylinderGeometry(0.25, 0.35, 1.6, 5).translate(0, 0.8, 0);
 const pineGeometry = new THREE.ConeGeometry(1.6, 4.2, 6).translate(0, 3.4, 0);
 const roundTreeGeometry = new THREE.IcosahedronGeometry(1.7, 0).translate(0, 2.9, 0);
+const postGeometry = new THREE.BoxGeometry(0.16, 0.9, 0.16).translate(0, 0.45, 0);
+const signGeometry = new THREE.BoxGeometry(1.3, 1.3, 0.12).rotateZ(Math.PI / 4).translate(0, 2.6, 0);
+const signPoleGeometry = new THREE.CylinderGeometry(0.06, 0.06, 2, 5).translate(0, 1, 0);
+const lampPoleGeometry = new THREE.CylinderGeometry(0.07, 0.1, 5.4, 5).translate(0, 2.7, 0);
+const lampGlowGeometry = new THREE.IcosahedronGeometry(0.3, 0).translate(0, 5.5, 0);
 const rockGeometry = new THREE.DodecahedronGeometry(1, 0);
 
 const LEAF_COLORS = ['#3f7d4e', '#4f9a5a', '#2f6b48', '#e3a14b', '#d9734e'].map((c) => new THREE.Color(c));
@@ -56,6 +65,28 @@ function ribbon(z0: number, z1: number, left: number, right: number, lift: numbe
     roadPoint(z, right, lift, b);
     roadPoint(zn, left, lift, c);
     roadPoint(zn, right, lift, d);
+    positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+    positions.push(b.x, b.y, b.z, d.x, d.y, d.z, c.x, c.y, c.z);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/** 도로를 따라가는 세로 띠(가드레일 면) */
+function wall(z0: number, z1: number, lateral: number, lo: number, hi: number): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const d = new THREE.Vector3();
+  for (let z = z0; z > z1; z -= ROAD_STEP) {
+    const zn = Math.max(z - ROAD_STEP, z1);
+    roadPoint(z, lateral, lo, a);
+    roadPoint(z, lateral, hi, b);
+    roadPoint(zn, lateral, lo, c);
+    roadPoint(zn, lateral, hi, d);
     positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
     positions.push(b.x, b.y, b.z, d.x, d.y, d.z, c.x, c.y, c.z);
   }
@@ -154,6 +185,64 @@ function buildScenery(group: THREE.Group, z0: number, rand: () => number): void 
   place(rockMesh, rocks, false, 1.3);
 }
 
+/** 도로 양옆 가드레일(레일 + 기둥), 급커브 표지판, 가로등 */
+function buildRoadside(group: THREE.Group, z0: number, z1: number): void {
+  const rails: THREE.BufferGeometry[] = [];
+  for (const side of [-1, 1]) {
+    const edge = side * (ROAD_HALF_WIDTH + 0.9);
+    rails.push(wall(z0, z1, edge, 0.5, 0.88));
+  }
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const one = new THREE.Vector3(1, 1, 1);
+  const up = new THREE.Vector3(0, 1, 0);
+  const p = new THREE.Vector3();
+
+  const postZs: number[] = [];
+  for (let z = z0; z > z1; z -= 4) postZs.push(z);
+  const posts = new THREE.InstancedMesh(postGeometry, postMaterial, postZs.length * 2);
+  postZs.forEach((z, i) => {
+    q.setFromAxisAngle(up, Math.atan(-roadDX(z)));
+    [-1, 1].forEach((side, k) => {
+      roadPoint(z, side * (ROAD_HALF_WIDTH + 0.9), 0, p);
+      m.compose(p, q, one);
+      posts.setMatrixAt(i * 2 + k, m);
+    });
+  });
+  posts.castShadow = true;
+  group.add(posts);
+  for (const g of rails) {
+    const mesh = new THREE.Mesh(g, railMaterial);
+    mesh.castShadow = true;
+    group.add(mesh);
+  }
+
+  // 커브가 심하면 노란 다이아몬드 표지판, 일정 간격으로 가로등
+  const zs = Math.floor(-z0 / 40);
+  const lampZ = z0 - 20;
+  const lampSide = zs % 2 === 0 ? 1 : -1;
+  const lampBase = roadPoint(lampZ, lampSide * (ROAD_HALF_WIDTH + 2), 0, new THREE.Vector3());
+  const lampPole = new THREE.Mesh(lampPoleGeometry, postMaterial);
+  lampPole.position.copy(lampBase);
+  const lampGlow = new THREE.Mesh(lampGlowGeometry, lampGlowMaterial);
+  lampGlow.position.copy(lampBase);
+  lampPole.userData.shared = lampGlow.userData.shared = true;
+  group.add(lampPole, lampGlow);
+
+  const curve = Math.abs(roadDX(z0 - 40) - roadDX(z0));
+  if (curve > 0.35) {
+    const side = roadDX(z0 - 40) > roadDX(z0) ? -1 : 1;
+    const base = roadPoint(z0 - 10, side * (ROAD_HALF_WIDTH + 2.2), 0, new THREE.Vector3());
+    const pole = new THREE.Mesh(signPoleGeometry, postMaterial);
+    const sign = new THREE.Mesh(signGeometry, signMaterial);
+    pole.position.copy(base);
+    sign.position.copy(base);
+    sign.rotation.y = Math.atan(-roadDX(z0 - 10)) + Math.PI;
+    pole.userData.shared = sign.userData.shared = true;
+    group.add(pole, sign);
+  }
+}
+
 class Chunk {
   readonly group = new THREE.Group();
 
@@ -173,13 +262,14 @@ class Chunk {
     this.group.add(new THREE.Mesh(ribbon(z0, z1, -ROAD_HALF_WIDTH + 0.3, -ROAD_HALF_WIDTH + 0.5, 0.04), lineMaterial));
     this.group.add(new THREE.Mesh(ribbon(z0, z1, ROAD_HALF_WIDTH - 0.5, ROAD_HALF_WIDTH - 0.3, 0.04), lineMaterial));
 
+    buildRoadside(this.group, z0, z1);
     buildScenery(this.group, z0, rand);
   }
 
   dispose(): void {
     this.group.traverse((obj) => {
       if (obj instanceof THREE.InstancedMesh) obj.dispose();
-      else if (obj instanceof THREE.Mesh) obj.geometry.dispose();
+      else if (obj instanceof THREE.Mesh && obj.userData.shared !== true) obj.geometry.dispose();
     });
   }
 }

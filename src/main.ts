@@ -27,6 +27,35 @@ const hudDistance = document.getElementById('hud-distance')!;
 const hudMode = document.getElementById('hud-mode')!;
 const startScreen = document.getElementById('start')!;
 const startButton = document.getElementById('start-button')!;
+const heroTitle = document.getElementById('hero-title')!;
+const heroSub = document.getElementById('hero-sub')!;
+const settingsBtn = document.getElementById('btn-settings')!;
+const settingsPanel = document.getElementById('settings-panel')!;
+const soundBtn = document.getElementById('btn-sound')!;
+
+const COPY = {
+  day: ['Just Drive', 'Beautiful roads, brighter days.'],
+  sunset: ['A Softer Way to Anywhere', 'No destinations. Just good roads.'],
+  night: ['Same Roads, New Feelings.', 'Day, sunset, or night — the road is always yours.'],
+} as const;
+let shownPhase = '';
+function syncTheme(): void {
+  const phase = sky.phase;
+  if (phase === shownPhase) return;
+  shownPhase = phase;
+  document.body.dataset.phase = phase;
+  [heroTitle.textContent, heroSub.textContent] = COPY[phase];
+  document.querySelectorAll<HTMLElement>('[data-theme-set]').forEach((b) => b.classList.toggle('active', b.dataset.themeSet === phase));
+}
+document.querySelectorAll<HTMLElement>('[data-theme-set]').forEach((b) =>
+  b.addEventListener('click', () => sky.setPhase(b.dataset.themeSet as 'day' | 'sunset' | 'night')),
+);
+settingsBtn.addEventListener('click', () => {
+  settingsPanel.hidden = !settingsPanel.hidden;
+  settingsBtn.setAttribute('aria-expanded', String(!settingsPanel.hidden));
+});
+// 소리는 아직 없다. 버튼은 자리만 잡아 두고 상태만 토글한다.
+soundBtn.addEventListener('click', () => soundBtn.setAttribute('aria-pressed', String(soundBtn.getAttribute('aria-pressed') !== 'true')));
 
 mountCarPicker(document.getElementById('car-picker')!, (spec) => car.setType(spec));
 
@@ -49,7 +78,7 @@ function start(): void {
 startButton.addEventListener('click', start);
 window.addEventListener('keydown', (e) => {
   if ((e.target as HTMLElement).closest?.('#car-picker')) return;
-  if (!started && (e.key === 'Enter' || e.key === ' ' || e.key.startsWith('Arrow'))) start();
+  if (!started && (e.key.startsWith('Arrow') || (!(e.target instanceof HTMLButtonElement) && (e.key === 'Enter' || e.key === ' ')))) start();
 });
 
 window.addEventListener('resize', () => {
@@ -68,6 +97,7 @@ function frame(): void {
   car.update(dt, input.state);
   world.update(car.z);
   sky.update(dt, car.object.position);
+  syncTheme();
   car.setNight(sky.night);
   rig.update(dt, car, elapsed);
 

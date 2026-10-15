@@ -88,6 +88,9 @@ const STONE_COLOR = new THREE.Color('#c9c2d4');
 // 에셋 높이를 월드 높이로 맞춘다 (기존 나무 한 그루 크기 기준)
 const ASSET_HEIGHT = { pine: 5.6, round: 4.8, bush: 1.2 } as const;
 const ASSET_ROCK_SCALE = 3.2;
+// 도로에서 이보다 먼 에셋은 그림자를 끄고 가벼운 모델(LIGHT_TRIS 이하)만 쓴다
+const FAR_LATERAL = 35;
+const LIGHT_TRIS = 80;
 const assetMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 
 const PINE_COLORS = ['#4fae78', '#5cbd82', '#3f9a6c'].map((c) => new THREE.Color(c));
@@ -210,7 +213,7 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
     if (y < waterY(z) + 1) return; // 물 속에는 심지 않는다
     items.push({ x, y, z, scale, rot: rand() * Math.PI * 2, kind });
   };
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 64; i++) {
     const z = z0 - rand() * CHUNK_LENGTH;
     const side = rand() < 0.85 ? -1 : 1; // 왼쪽 숲이 더 빽빽, 오른쪽은 바다가 보이도록 듬성듬성
     const offset = ROAD_HALF_WIDTH + (side < 0 ? 6 : 14) + Math.pow(rand(), 1.5) * 140;
@@ -251,11 +254,15 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
   place(new THREE.InstancedMesh(rockGeometry, cliffMaterial, cliffs.length), cliffs, [CLIFF, CLIFF.clone().offsetHSL(0, 0, 0.04)], 1, 1.5);
 
   if (scenery) {
-    // 한 청크의 나무·바위·덤불을 메쉬 하나로 합쳐 그리기 호출을 1번으로 줄인다
-    const merged = mergeScenery(items.filter((it) => it.kind !== 'cliff'), rand);
-    merged.castShadow = true;
-    merged.receiveShadow = true;
-    group.add(merged);
+    // 한 청크의 나무·바위·덤불을 길가(그림자 있음)와 먼 곳(그림자 없음, 가벼운 모델) 두 메쉬로 합친다
+    const far = (it: SceneryItem) => Math.abs(it.x - roadX(it.z)) > FAR_LATERAL;
+    const rest = items.filter((it) => it.kind !== 'cliff');
+    const near = mergeScenery(rest.filter((it) => !far(it)), rand, false);
+    near.castShadow = true;
+    near.receiveShadow = true;
+    const distant = mergeScenery(rest.filter(far), rand, true);
+    distant.receiveShadow = true;
+    group.add(near, distant);
   } else {
     // 에셋을 못 받았을 때 쓰는 코드 생성 모양
     const trees = items.filter((it) => it.kind === 'pine' || it.kind === 'round');
@@ -279,10 +286,13 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
 type SceneryItem = { x: number; y: number; z: number; scale: number; rot: number; kind: 'pine' | 'round' | 'rock' | 'bush' | 'cliff' };
 
 /** 에셋을 청크 단위 정적 메쉬 하나로 합친다. 색은 정점에 구워 넣는다. */
-function mergeScenery(items: SceneryItem[], rand: () => number): THREE.Mesh {
+function mergeScenery(items: SceneryItem[], rand: () => number, light: boolean): THREE.Mesh {
   const set = scenery!;
+  // 먼 곳은 안개에 묻혀 디테일이 안 보이니 삼각형이 적은 모델만 쓴다
+  const pool = (list: Variant[]) => (light ? list.filter((v) => v.tris <= LIGHT_TRIS) : list);
+  const pools = { pine: pool(set.pines), round: pool(set.roundTrees), bush: pool(set.bushes), rock: pool(set.rocks) };
   const chosen = items.map((it) => {
-    const list: Variant[] = it.kind === 'pine' ? set.pines : it.kind === 'round' ? set.roundTrees : it.kind === 'bush' ? set.bushes : set.rocks;
+    const list: Variant[] = pools[it.kind as keyof typeof pools];
     return { it, v: list[Math.floor(rand() * list.length)] };
   });
   let verts = 0;

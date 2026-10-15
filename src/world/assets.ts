@@ -14,6 +14,7 @@ export interface Variant {
   index: Uint16Array;
   part: Uint8Array;
   height: number;
+  tris: number;
 }
 
 export interface ScenerySet {
@@ -74,6 +75,7 @@ function toVariant(root: THREE.Object3D): Variant {
     index: new Uint16Array(indices),
     part: new Uint8Array(parts),
     height: Math.max(height, 0.01),
+    tris: indices.length / 3,
   };
 }
 

@@ -37,13 +37,20 @@ fpsToggle.addEventListener('change', () => {
   try { localStorage.setItem(FPS_KEY, fpsToggle.checked ? '1' : '0'); } catch { /* 무시 */ }
 });
 const QUALITY_LABEL = { high: '높음', medium: '중간', low: '낮음' } as const;
+// 그래픽 가속이 꺼져 소프트웨어로 그리는 경우(SwiftShader 등) FPS 옆에 알려 준다
+const GPU_NAME = (() => {
+  const gl = renderer.getContext();
+  const ext = gl.getExtension('WEBGL_debug_renderer_info');
+  return ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+})();
+const SOFTWARE_GPU = /swiftshader|llvmpipe|software|basic render/i.test(GPU_NAME);
 let fpsFrames = 0;
 let fpsTime = 0;
 function updateFps(raw: number): void {
   fpsFrames++;
   fpsTime += raw;
   if (fpsTime < 0.5) return;
-  if (!fpsBox.hidden) fpsBox.textContent = `${Math.round(fpsFrames / fpsTime)} fps · 화질 ${QUALITY_LABEL[quality.level]}`;
+  if (!fpsBox.hidden) fpsBox.textContent = `${Math.round(fpsFrames / fpsTime)} fps · 화질 ${QUALITY_LABEL[quality.level]}${SOFTWARE_GPU ? ' · 그래픽 가속 꺼짐' : ''}`;
   fpsFrames = 0;
   fpsTime = 0;
 }

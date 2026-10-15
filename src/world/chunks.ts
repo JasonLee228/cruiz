@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ROAD_HALF_WIDTH, roadDX, roadX, roadY, terrainY, waterY } from './path';
 import { mulberry32 } from './random';
 
@@ -19,7 +20,7 @@ const terrainMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flat
 const roadMaterial = new THREE.MeshLambertMaterial({ color: '#7e8197' });
 export const lineMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff' });
 const trunkMaterial = new THREE.MeshLambertMaterial({ color: '#7a5235', flatShading: true });
-const leafMaterial = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true });
+const leafMaterial = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true, vertexColors: true });
 const railMaterial = new THREE.MeshLambertMaterial({ color: '#dfe3ee', flatShading: true, side: THREE.DoubleSide });
 const postMaterial = new THREE.MeshLambertMaterial({ color: '#aab0c4', flatShading: true });
 const signMaterial = new THREE.MeshLambertMaterial({ color: '#f2c14e', flatShading: true });
@@ -33,9 +34,46 @@ const whiteMaterial = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShad
 const redMaterial = new THREE.MeshLambertMaterial({ color: '#e8606a', flatShading: true });
 
 const trunkGeometry = new THREE.CylinderGeometry(0.25, 0.35, 1.6, 5).translate(0, 0.8, 0);
-const pineGeometry = new THREE.ConeGeometry(1.6, 4.2, 6).translate(0, 3.4, 0);
-const roundTreeGeometry = new THREE.IcosahedronGeometry(1.8, 1).translate(0, 3.0, 0);
-const bushGeometry = new THREE.IcosahedronGeometry(0.9, 1).scale(1.2, 0.8, 1.1).translate(0, 0.5, 0);
+/**
+ * 잎 덩어리 여러 개를 합친 나무 모양. 아래쪽은 어둡고 위쪽은 밝게 정점 색을 줘서
+ * 한 가지 색만 입혀도 입체감이 생긴다 (인스턴스 색과 곱해진다).
+ */
+function foliage(parts: THREE.BufferGeometry[], bottom: number, top: number): THREE.BufferGeometry {
+  const merged = mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
+  parts.forEach((g) => g.dispose());
+  const pos = merged.attributes.position as THREE.BufferAttribute;
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i += 3) {
+    // 면 하나에 한 밝기 → 로우폴리 질감 유지
+    const y = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3;
+    const t = THREE.MathUtils.clamp((y - bottom) / (top - bottom), 0, 1);
+    const shade = 0.72 + t * 0.38 + (((i * 7919) % 13) / 13 - 0.5) * 0.06;
+    for (let k = 0; k < 3; k++) colors.set([shade, shade, shade], (i + k) * 3);
+  }
+  merged.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  merged.computeVertexNormals();
+  return merged;
+}
+const blob = (r: number, x: number, y: number, z: number, sy = 1) =>
+  new THREE.IcosahedronGeometry(r, 1).scale(1, sy, 1).translate(x, y, z);
+// 소나무: 원뿔 세 단을 겹친다
+const pineGeometry = foliage([
+  new THREE.ConeGeometry(1.8, 2.6, 7).translate(0, 2.4, 0),
+  new THREE.ConeGeometry(1.45, 2.3, 7).rotateY(0.4).translate(0, 3.5, 0),
+  new THREE.ConeGeometry(1.0, 2.0, 7).rotateY(0.9).translate(0, 4.6, 0),
+], 1.2, 5.6);
+// 활엽수: 크기가 다른 잎 덩어리 네 개
+const roundTreeGeometry = foliage([
+  blob(1.6, 0, 3.0, 0, 0.9),
+  blob(1.15, 0.95, 3.6, 0.3),
+  blob(1.1, -0.85, 3.5, -0.35),
+  blob(1.0, 0.1, 4.3, -0.2),
+], 1.6, 5.2);
+const bushGeometry = foliage([
+  blob(0.85, 0, 0.55, 0, 0.75),
+  blob(0.6, 0.7, 0.45, 0.2, 0.75),
+  blob(0.55, -0.65, 0.4, -0.15, 0.75),
+], 0, 1.2);
 const postGeometry = new THREE.BoxGeometry(0.16, 0.9, 0.16).translate(0, 0.45, 0);
 const signGeometry = new THREE.BoxGeometry(1.3, 1.3, 0.12).rotateZ(Math.PI / 4).translate(0, 2.6, 0);
 const signPoleGeometry = new THREE.CylinderGeometry(0.06, 0.06, 2, 5).translate(0, 1, 0);

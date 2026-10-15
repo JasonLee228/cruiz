@@ -20,16 +20,16 @@ const GradeShader = {
       vec3 c = src.rgb;
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       // 채도 +18%
-      c = max(mix(vec3(l), c, 1.18), 0.0);
+      c = max(mix(vec3(l), c, 1.06), 0.0);
       // 그림자는 차갑고 보랏빛으로, 밝은 곳은 따뜻하게
-      c = mix(c, c * vec3(0.92, 0.9, 1.08), (1.0 - smoothstep(0.0, 0.5, l)) * 0.6);
-      c = mix(c, c * tint * 1.04, smoothstep(0.45, 1.0, l) * 0.35);
+      c = mix(c, c * vec3(0.92, 0.9, 1.08), (1.0 - smoothstep(0.0, 0.5, l)) * 0.35);
+      c = mix(c, c * tint, smoothstep(0.45, 1.0, l) * 0.15);
       // 대비는 부드럽게 (S 커브)
       vec3 sc = clamp(c, 0.0, 1.0);
-      c += (sc * sc * (3.0 - 2.0 * sc) - sc) * 0.25 * amount;
+      c += (sc * sc * (3.0 - 2.0 * sc) - sc) * 0.1 * amount;
       // 비네트
       vec2 d = vUv - 0.5;
-      c *= 1.0 - dot(d, d) * 0.55;
+      c *= 1.0 - dot(d, d) * 0.3;
       gl_FragColor = vec4(c, src.a);
     }`,
 };
@@ -43,7 +43,7 @@ export interface Post {
 
 export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Post {
   renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.0;
 
   const size = renderer.getSize(new THREE.Vector2());
   const target = new THREE.WebGLRenderTarget(size.x * renderer.getPixelRatio(), size.y * renderer.getPixelRatio(), {
@@ -52,7 +52,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   });
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(size, 0.32, 0.9, 0.82);
+  const bloom = new UnrealBloomPass(size, 0.25, 0.6, 1.0);
   composer.addPass(bloom);
   const grade = new ShaderPass(GradeShader);
   composer.addPass(grade);
@@ -62,8 +62,8 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
     render: (dt) => composer.render(dt),
     resize: (w, h) => composer.setSize(w, h),
     setNight: (n) => {
-      bloom.strength = 0.32 + n * 0.3;
-      bloom.threshold = 0.82 - n * 0.08;
+      bloom.strength = 0.25 + n * 0.2;
+      bloom.threshold = 1.0 - n * 0.05;
     },
   };
 }

@@ -189,7 +189,7 @@ export class Sky {
     this.sunDisc.visible = elev > -0.05;
     this.sunDisc.position.set(focus.x + 120, Math.max(elev, -0.05) * 380 + 20, focus.z - 760);
     this.sunDisc.scale.setScalar(55 + (1 - Math.max(elev, 0)) * 30);
-    (this.sunDisc.material as THREE.MeshBasicMaterial).color.copy(this.sun.color).lerp(new THREE.Color('#fff4c8'), 0.4);
+    (this.sunDisc.material as THREE.MeshBasicMaterial).color.copy(this.sun.color).lerp(new THREE.Color('#fff4c8'), 0.4).multiplyScalar(1.6);
     this.domeUniforms.glow.value.copy(this.sun.color);
     this.domeUniforms.glowAmount.value = 0.5 * (1 - Math.max(elev, 0) * 0.6) * (this.night > 0.8 ? 0.3 : 1);
     this.domeUniforms.sunDir.value.set(120, this.sunDisc.position.y, -760);

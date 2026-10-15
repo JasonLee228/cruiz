@@ -109,7 +109,7 @@ function frame(): void {
 
   post.setNight(sky.night);
   // 차선은 조명을 받지 않는 재질이라, 밤에는 직접 어둡게 해 과하게 번지지 않게 한다
-  lineMaterial.color.setScalar(1 - sky.night * 0.5);
+  lineMaterial.color.setScalar(0.9 * (1 - sky.night * 0.5));
   post.render(dt);
   requestAnimationFrame(frame);
 }

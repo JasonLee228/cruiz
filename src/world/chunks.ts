@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { ROAD_HALF_WIDTH, roadDX, roadX, roadY, terrainY, waterY } from './path';
 import { mulberry32 } from './random';
 import { BARK, LEAF, scenery, type Variant } from './assets';
+import { cliffVariants } from './cliffs';
 
 const CHUNK_LENGTH = 80;
 const CHUNKS_AHEAD = 7;
@@ -28,7 +29,6 @@ const postMaterial = new THREE.MeshLambertMaterial({ color: '#aab0c4', flatShadi
 const signMaterial = new THREE.MeshLambertMaterial({ color: '#f2c14e', flatShading: true });
 const lampGlowMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffe3a0').multiplyScalar(2.5), fog: false });
 const rockMaterial = new THREE.MeshLambertMaterial({ color: '#c9c2d4', flatShading: true });
-const cliffMaterial = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true });
 const waterMaterial = new THREE.MeshLambertMaterial({ color: '#4cc3dd', flatShading: true, transparent: true, opacity: 0.92 });
 const wallMaterials = ['#fff1dc', '#ffd9c2', '#d9ecf7', '#fbe3a8'].map((c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true }));
 const roofMaterials = ['#ee8b72', '#e57a8a', '#f2a65a'].map((c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true }));
@@ -89,6 +89,9 @@ const STONE_COLOR = new THREE.Color('#c9c2d4');
 // 에셋 높이를 월드 높이로 맞춘다 (기존 나무 한 그루 크기 기준)
 const ASSET_HEIGHT = { pine: 5.6, round: 4.8, bush: 1.2 } as const;
 const ASSET_ROCK_SCALE = 3.2;
+// 절벽 바위와 도로 가장자리 사이 최소 간격(가드레일·가로등 자리), 땅에 묻는 깊이
+const CLIFF_MARGIN = 3;
+const CLIFF_SINK = 1;
 // 도로에서 이보다 먼 에셋은 그림자를 끄고 가벼운 모델(LIGHT_TRIS 이하)만 쓴다
 const FAR_LATERAL = 35;
 const LIGHT_TRIS = 80;
@@ -230,11 +233,25 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
     const side = rand() < 0.5 ? -1 : 1;
     add(z, roadX(z) + side * (ROAD_HALF_WIDTH + (side < 0 ? 4 : 8) + rand() * 10), 0.7 + rand() * 0.9, 'bush');
   }
-  // 왼쪽 길가의 연한 절벽 바위
-  const cliffCount = Math.floor(rand() * 5);
-  for (let i = 0; i < cliffCount; i++) {
-    const z = z0 - rand() * CHUNK_LENGTH;
-    add(z, roadX(z) - (ROAD_HALF_WIDTH + 12 + rand() * 20), 4 + rand() * 5, 'cliff');
+  // 왼쪽 길가 절벽: 청크 절반 정도에 큰 바위 몇 개가 이어진 벽으로 나온다
+  if (rand() < 0.55) {
+    const count = 3 + Math.floor(rand() * 4);
+    let z = z0 - 4 - rand() * 24;
+    for (let i = 0; i < count && z > z0 - CHUNK_LENGTH; i++) {
+      const variant = Math.floor(rand() * cliffVariants.length);
+      const scale = 3.5 + rand() * 3;
+      const r = cliffVariants[variant].radius! * scale;
+      // 바위가 걸치는 z 구간 전체에서 도로 왼쪽 가장자리를 재어, 커브에서도 도로·가드레일·가로등을 침범하지 않게 한다
+      let edge = Infinity;
+      for (let k = -2; k <= 2; k++) edge = Math.min(edge, roadX(z + (k / 2) * r) - ROAD_HALF_WIDTH);
+      const x = edge - CLIFF_MARGIN - r;
+      // 도로 쪽 바닥이 뜨지 않게 지형과 도로 중 낮은 쪽에 앉힌다
+      const y = Math.min(terrainY(x, z), roadY(z));
+      // 긴 축이 도로 방향을 따르도록 돌리고(앞뒤는 무작위), 약간만 비튼다
+      const rot = Math.atan(roadDX(z)) + (rand() < 0.5 ? 0 : Math.PI) + (rand() - 0.5) * 0.4;
+      if (y >= waterY(z) + 1) items.push({ x, y, z, scale, rot, kind: 'cliff', variant });
+      z -= r * (1.1 + rand() * 0.4);
+    }
   }
   for (let i = 0; i < 6; i++) {
     const z = z0 - rand() * CHUNK_LENGTH;
@@ -256,7 +273,13 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
     group.add(mesh);
   };
   const cliffs = by('cliff');
-  place(new THREE.InstancedMesh(rockGeometry, cliffMaterial, cliffs.length), cliffs, [CLIFF, CLIFF.clone().offsetHSL(0, 0, 0.04)], 1, 1.5);
+  if (cliffs.length) {
+    const cliffMesh = mergeVariants(cliffs.map((it) => ({ it, v: cliffVariants[it.variant ?? 0] })), rand);
+    cliffMesh.name = 'cliffs';
+    cliffMesh.castShadow = true;
+    cliffMesh.receiveShadow = true;
+    group.add(cliffMesh);
+  }
 
   if (scenery) {
     // 한 청크의 나무·바위·덤불을 길가(그림자 있음)와 먼 곳(그림자 없음, 가벼운 모델) 두 메쉬로 합친다
@@ -288,7 +311,12 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
   buildBoats(group, z0, rand);
 }
 
-type SceneryItem = { x: number; y: number; z: number; scale: number; rot: number; kind: 'pine' | 'round' | 'rock' | 'bush' | 'cliff' };
+type SceneryItem = {
+  x: number; y: number; z: number; scale: number; rot: number;
+  kind: 'pine' | 'round' | 'rock' | 'bush' | 'cliff';
+  /** 절벽처럼 배치할 때 모양을 미리 고른 경우 */
+  variant?: number;
+};
 
 /** 에셋을 청크 단위 정적 메쉬 하나로 합친다. 색은 정점에 구워 넣는다. */
 function mergeScenery(items: SceneryItem[], rand: () => number, light: boolean): THREE.Mesh {
@@ -300,6 +328,11 @@ function mergeScenery(items: SceneryItem[], rand: () => number, light: boolean):
     const list: Variant[] = pools[it.kind as keyof typeof pools];
     return { it, v: list[Math.floor(rand() * list.length)] };
   });
+  return mergeVariants(chosen, rand);
+}
+
+/** 고른 모델들을 위치·회전·크기를 적용해 메쉬 하나로 합친다. 색은 정점에 구워 넣는다. */
+function mergeVariants(chosen: { it: SceneryItem; v: Variant }[], rand: () => number): THREE.Mesh {
   let verts = 0;
   let idx = 0;
   for (const { v } of chosen) { verts += v.part.length; idx += v.index.length; }
@@ -311,12 +344,12 @@ function mergeScenery(items: SceneryItem[], rand: () => number, light: boolean):
   let vo = 0;
   let io = 0;
   for (const { it, v } of chosen) {
-    const k = it.kind === 'rock'
-      ? ASSET_ROCK_SCALE * it.scale
+    const k = it.kind === 'cliff' ? it.scale
+      : it.kind === 'rock' ? ASSET_ROCK_SCALE * it.scale
       : (ASSET_HEIGHT[it.kind as 'pine' | 'round' | 'bush'] * it.scale) / v.height;
     const c = Math.cos(it.rot);
     const sn = Math.sin(it.rot);
-    const sink = it.kind === 'rock' ? 0.25 : 0;
+    const sink = it.kind === 'cliff' ? CLIFF_SINK : it.kind === 'rock' ? 0.25 : 0;
     const palette = it.kind === 'pine' ? PINE_COLORS : LEAF_COLORS;
     // 단풍색(팔레트 뒤쪽 둘)은 가끔만 섞어 숲이 초록 위주로 보이게 한다
     const leaf = palette[Math.floor(rand() * (rand() < 0.2 ? palette.length : Math.min(palette.length, 4)))];
@@ -332,7 +365,8 @@ function mergeScenery(items: SceneryItem[], rand: () => number, light: boolean):
       normal[o + 1] = v.normal[i * 3 + 1];
       normal[o + 2] = -sn * nx + c * nz;
       const part = v.part[i];
-      if (part === LEAF) {
+      if (v.color) tint.fromArray(v.color, i * 3).multiplyScalar(stoneShade);
+      else if (part === LEAF) {
         // 아래는 어둡고 위는 밝게: 기존 잎 덩어리와 같은 입체감
         const t = Math.min(Math.max(py / v.height, 0), 1);
         tint.copy(leaf).multiplyScalar(0.72 + t * 0.38);

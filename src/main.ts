@@ -3,6 +3,7 @@ import { Car } from './car/car';
 import { CameraRig } from './car/camera';
 import { Input } from './input';
 import { ChunkManager, lineMaterial } from './world/chunks';
+import { loadScenery } from './world/assets';
 import { Sky } from './world/sky';
 import { loadCarId, mountCarPicker } from './ui/carPicker';
 import { createPost } from './post';
@@ -144,4 +145,5 @@ function frame(): void {
 // 테스트·스크린샷용 훅
 (window as unknown as { cruiz: unknown }).cruiz = { car, sky, rig, start, quality, renderer };
 
-requestAnimationFrame(frame);
+// 자연 에셋(약 300KB)을 먼저 받고 시작한다. 실패해도 기본 모양으로 이어진다.
+loadScenery().finally(() => requestAnimationFrame(frame));

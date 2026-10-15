@@ -4,7 +4,7 @@ import { CameraRig } from './car/camera';
 import { Input } from './input';
 import { ChunkManager } from './world/chunks';
 import { Sky } from './world/sky';
-import { CARS, getSpec } from './car/models';
+import { loadCarId, mountCarPicker } from './ui/carPicker';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -16,10 +16,6 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const sky = new Sky(scene);
 const world = new ChunkManager(scene);
-const CAR_KEY = 'cruiz.car';
-function loadCarId(): string | null {
-  try { return localStorage.getItem(CAR_KEY); } catch { return null; }
-}
 const car = new Car(loadCarId() ?? undefined);
 scene.add(car.object);
 const rig = new CameraRig();
@@ -32,29 +28,7 @@ const hudMode = document.getElementById('hud-mode')!;
 const startScreen = document.getElementById('start')!;
 const startButton = document.getElementById('start-button')!;
 
-const picker = document.getElementById('car-picker')!;
-let currentCar = getSpec(loadCarId()).id;
-for (const spec of CARS) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'car-option';
-  btn.setAttribute('role', 'radio');
-  btn.innerHTML = `<i style="--c:${spec.swatch}"></i>${spec.name}`;
-  btn.addEventListener('click', () => {
-    currentCar = spec.id;
-    car.setType(spec);
-    try { localStorage.setItem(CAR_KEY, spec.id); } catch { /* 저장 불가 환경은 무시 */ }
-    refreshPicker();
-  });
-  btn.dataset.id = spec.id;
-  picker.appendChild(btn);
-}
-function refreshPicker(): void {
-  for (const b of picker.querySelectorAll<HTMLElement>('.car-option')) {
-    b.setAttribute('aria-checked', String(b.dataset.id === currentCar));
-  }
-}
-refreshPicker();
+mountCarPicker(document.getElementById('car-picker')!, (spec) => car.setType(spec));
 
 input.onToggleCamera = () => rig.next();
 input.onToggleAutopilot = (on) => (hudMode.hidden = !on);

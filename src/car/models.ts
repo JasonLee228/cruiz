@@ -83,21 +83,74 @@ export function buildCar(spec: CarSpec): CarModel {
   const { body: b, cabin: c, wheel: w } = spec;
   const halfL = b.l / 2;
 
-  const body = box(b.w, b.h, b.l, b.color);
-  body.position.y = b.y;
+  const mat = (color: string) => new THREE.MeshLambertMaterial({ color, flatShading: true });
+  const part = (geo: THREE.BufferGeometry, color: string): THREE.Mesh => {
+    const mesh = new THREE.Mesh(geo, mat(color));
+    mesh.castShadow = true;
+    return mesh;
+  };
+  /** 옆모습(앞이 +x)을 그려 폭만큼 밀어낸 뒤 앞이 -z가 되도록 돌린다. 모서리는 살짝 깎아 둥글게. */
+  const extrude = (shape: THREE.Shape, width: number, bevel: number): THREE.BufferGeometry => {
+    const g = new THREE.ExtrudeGeometry(shape, { depth: width - bevel * 2, bevelEnabled: true, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 2, curveSegments: 3 });
+    g.translate(0, 0, -(width - bevel * 2) / 2);
+    g.rotateY(Math.PI / 2);
+    return g;
+  };
+  const rounded = (l: number, h: number, r: number): THREE.Shape => {
+    const sh = new THREE.Shape();
+    const x0 = -l / 2, x1 = l / 2;
+    sh.moveTo(x0 + r, 0);
+    sh.lineTo(x1 - r, 0);
+    sh.quadraticCurveTo(x1, 0, x1, r);
+    sh.lineTo(x1, h * 0.55);
+    sh.quadraticCurveTo(x1, h, x1 - h * 0.7, h); // 보닛
+    sh.lineTo(x0 + r * 1.5, h);
+    sh.quadraticCurveTo(x0, h, x0, h - r);
+    sh.lineTo(x0, r);
+    sh.quadraticCurveTo(x0, 0, x0 + r, 0);
+    return sh;
+  };
+
+  const bevel = 0.16;
+  const body = part(extrude(rounded(b.l - bevel * 2, b.h - bevel * 2, 0.5), b.w, bevel), b.color);
+  body.position.y = b.y - b.h / 2 + bevel;
   root.add(body);
 
-  const cabin = box(c.w, c.h, c.l, c.color);
-  cabin.position.set(0, c.y, c.z);
+  // 캐빈: 앞유리가 눕고 뒤는 완만하게 떨어진다
+  const cl = c.l - bevel * 2;
+  const ch = c.h - bevel * 2;
+  const cab = new THREE.Shape();
+  cab.moveTo(-cl / 2, 0);
+  cab.lineTo(cl / 2, 0);
+  cab.lineTo(cl * 0.26, ch);
+  cab.lineTo(-cl * 0.34, ch);
+  cab.quadraticCurveTo(-cl * 0.5, ch * 0.8, -cl * 0.56, 0);
+  const cabin = part(extrude(cab, c.w * 0.94, bevel), spec.glassColor);
+  cabin.position.set(0, c.y - c.h / 2 + bevel, -c.z * 0 + c.z);
+  // 앞이 -z 이므로 shape의 +x(앞)가 -z로 간다. c.z는 뒤쪽(+z) 오프셋.
   root.add(cabin);
-
-  const glass = box(c.w + 0.02, c.h * 0.65, c.l * 0.95, spec.glassColor);
-  glass.position.set(0, c.y + 0.03, c.z);
-  root.add(glass);
+  const roof = part(extrude(new THREE.Shape([
+    new THREE.Vector2(-cl * 0.4, -0.08), new THREE.Vector2(cl * 0.26, -0.08),
+    new THREE.Vector2(cl * 0.26 + 0.02, 0.05), new THREE.Vector2(-cl * 0.4 - 0.02, 0.05),
+  ]), c.w * 0.97, 0.04), c.color);
+  roof.position.set(0, c.y - c.h / 2 + bevel + ch, c.z);
+  root.add(roof);
+  // 필러(앞·뒤 기둥)
+  for (const sx of [-1, 1]) {
+    const pillar = part(new THREE.BoxGeometry(0.08, ch * 0.95, 0.12), c.color);
+    pillar.position.set(sx * c.w * 0.46, c.y - c.h / 2 + bevel + ch / 2, c.z - cl * 0.3);
+    root.add(pillar);
+  }
+  // 사이드 미러
+  for (const sx of [-1, 1]) {
+    const mirror = part(new THREE.BoxGeometry(0.16, 0.14, 0.2), b.color);
+    mirror.position.set(sx * (c.w * 0.5 + 0.1), c.y - c.h * 0.15, c.z - cl * 0.28);
+    root.add(mirror);
+  }
 
   const bumperY = b.y - b.h / 2 + 0.1;
   for (const z of [-halfL, halfL]) {
-    const bumper = box(b.w + 0.05, 0.25, 0.25, '#3a3546');
+    const bumper = box(b.w - 0.1, 0.22, 0.25, '#e6e3ee');
     bumper.position.set(0, bumperY, z);
     root.add(bumper);
   }
@@ -106,11 +159,11 @@ export function buildCar(spec: CarSpec): CarModel {
   const lampMat = new THREE.MeshBasicMaterial({ color: '#fff4c2' });
   const tail = new THREE.MeshBasicMaterial({ color: '#8a2a2a' });
   for (const x of [-b.w * 0.34, b.w * 0.34]) {
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.05), lampMat);
-    head.position.set(x, lampY, -halfL - 0.01);
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.1, 10).rotateX(Math.PI / 2), lampMat);
+    head.position.set(x, lampY, -halfL + 0.02);
     root.add(head);
-    const rear = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.14, 0.05), tail);
-    rear.position.set(x, lampY, halfL + 0.01);
+    const rear = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.16, 0.08), tail);
+    rear.position.set(x, lampY, halfL - 0.02);
     root.add(rear);
   }
 
@@ -143,9 +196,15 @@ export function buildCar(spec: CarSpec): CarModel {
     const wm = new THREE.Mesh(wheelGeo, wheelMat);
     wm.position.set(x, w.r, z);
     wm.castShadow = true;
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(w.r * 0.55, w.r * 0.55, w.width + 0.02, 8).rotateZ(Math.PI / 2), mat('#d9dce8'));
+    wm.add(cap);
     root.add(wm);
     wheels.push(wm);
   }
+
+  const plate = part(new THREE.BoxGeometry(0.5, 0.18, 0.04), '#f7d86a');
+  plate.position.set(0, b.y - b.h * 0.2, halfL + 0.03);
+  root.add(plate);
 
   const headlight = new THREE.SpotLight('#fff1c9', 0, 60, 0.5, 0.6, 1.2);
   headlight.position.set(0, lampY, -halfL + 0.1);

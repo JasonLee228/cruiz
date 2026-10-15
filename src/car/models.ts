@@ -124,23 +124,48 @@ export function buildCar(spec: CarSpec): CarModel {
   cab.lineTo(cl / 2, 0);
   cab.lineTo(cl * 0.26, ch);
   cab.lineTo(-cl * 0.34, ch);
-  cab.quadraticCurveTo(-cl * 0.5, ch * 0.8, -cl * 0.56, 0);
-  const cabin = part(extrude(cab, c.w * 0.94, bevel), spec.glassColor);
-  cabin.position.set(0, c.y - c.h / 2 + bevel, -c.z * 0 + c.z);
+  cab.lineTo(-cl * 0.56, 0);
   // 앞이 -z 이므로 shape의 +x(앞)가 -z로 간다. c.z는 뒤쪽(+z) 오프셋.
+  const cabBase = c.y - c.h / 2 + bevel;
+  const cabin = part(extrude(cab, c.w * 0.94, bevel), c.color);
+  cabin.position.set(0, cabBase, c.z);
   root.add(cabin);
-  const roof = part(extrude(new THREE.Shape([
-    new THREE.Vector2(-cl * 0.4, -0.08), new THREE.Vector2(cl * 0.26, -0.08),
-    new THREE.Vector2(cl * 0.26 + 0.02, 0.05), new THREE.Vector2(-cl * 0.4 - 0.02, 0.05),
-  ]), c.w * 0.97, 0.04), c.color);
-  roof.position.set(0, c.y - c.h / 2 + bevel + ch, c.z);
-  root.add(roof);
-  // 필러(앞·뒤 기둥)
+
+  // 유리: 옆창은 캐빈 옆면에 테두리를 남기고 붙이고, 앞·뒷유리는 경사면에 판을 얹는다
+  const glassMat = new THREE.MeshLambertMaterial({ color: spec.glassColor, flatShading: true });
+  const side = new THREE.Shape();
+  side.moveTo(-cl * 0.44, ch * 0.12);
+  side.lineTo(cl * 0.36, ch * 0.12);
+  side.lineTo(cl * 0.22, ch * 0.86);
+  side.lineTo(-cl * 0.3, ch * 0.86);
+  side.quadraticCurveTo(-cl * 0.4, ch * 0.7, -cl * 0.44, ch * 0.12);
+  const sideGeo = new THREE.ShapeGeometry(side).rotateY(Math.PI / 2);
   for (const sx of [-1, 1]) {
-    const pillar = part(new THREE.BoxGeometry(0.08, ch * 0.95, 0.12), c.color);
-    pillar.position.set(sx * c.w * 0.46, c.y - c.h / 2 + bevel + ch / 2, c.z - cl * 0.3);
-    root.add(pillar);
+    const pane = new THREE.Mesh(sideGeo, glassMat);
+    pane.position.set(sx * (c.w * 0.47 + bevel + 0.01), cabBase, c.z);
+    if (sx < 0) pane.scale.x = -1; // 왼쪽 면은 거울처럼 뒤집어 바깥을 보게
+    root.add(pane);
   }
+  /** 캐빈 경사면(shape 좌표의 두 점 사이) 바로 바깥에 유리판을 얹는다. 차 좌표에서 z = c.z - x */
+  const slopePane = (ax: number, ay: number, bx: number, by: number, width: number) => {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    // 캐빈 중심에서 멀어지는 쪽 법선
+    let nx = dy / len;
+    let ny = -dx / len;
+    const mx = (ax + bx) / 2;
+    const my = (ay + by) / 2;
+    if (nx * mx + ny * (my - ch / 2) < 0) { nx = -nx; ny = -ny; }
+    const off = bevel + 0.02;
+    const pane = new THREE.Mesh(new THREE.BoxGeometry(width, len * 0.82, 0.03), glassMat);
+    pane.position.set(0, cabBase + my + ny * off, c.z - (mx + nx * off));
+    pane.rotation.x = Math.atan2(-dx, dy);
+    return pane;
+  };
+  root.add(slopePane(cl * 0.26, ch, cl * 0.5, 0, c.w * 0.8)); // 앞유리
+  root.add(slopePane(-cl * 0.34, ch, -cl * 0.56, 0, c.w * 0.76)); // 뒷유리
+
   // 사이드 미러
   for (const sx of [-1, 1]) {
     const mirror = part(new THREE.BoxGeometry(0.16, 0.14, 0.2), b.color);
@@ -159,12 +184,19 @@ export function buildCar(spec: CarSpec): CarModel {
   const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#fff4c2').multiplyScalar(2.5) });
   const tail = new THREE.MeshBasicMaterial({ color: '#8a2a2a' });
   for (const x of [-b.w * 0.34, b.w * 0.34]) {
-    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.1, 10).rotateX(Math.PI / 2), lampMat);
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.1, 12).rotateX(Math.PI / 2), lampMat);
     head.position.set(x, lampY, -halfL + 0.02);
     root.add(head);
-    const rear = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.16, 0.08), tail);
-    rear.position.set(x, lampY, halfL - 0.02);
+    const rear = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.17, 0.08), tail);
+    rear.position.set(x, lampY, halfL - 0.01);
     root.add(rear);
+    // 옆으로 살짝 감싸는 후미등
+    const wrap = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.17, 0.22), tail);
+    wrap.position.set(Math.sign(x) * (b.w / 2 - 0.02), lampY, halfL - 0.14);
+    root.add(wrap);
+    const ring = part(new THREE.CylinderGeometry(0.21, 0.21, 0.06, 12).rotateX(Math.PI / 2), '#f1eff6');
+    ring.position.set(x, lampY, -halfL + 0.0);
+    root.add(ring);
   }
 
   if (spec.extras === 'spoiler') {
@@ -189,18 +221,33 @@ export function buildCar(spec: CarSpec): CarModel {
     root.add(stripe);
   }
 
-  const wheelGeo = new THREE.CylinderGeometry(w.r, w.r, w.width, 8).rotateZ(Math.PI / 2);
+  const wheelGeo = new THREE.CylinderGeometry(w.r, w.r, w.width, 14).rotateZ(Math.PI / 2);
   const wheelMat = new THREE.MeshLambertMaterial({ color: '#2b2733', flatShading: true });
   const wheels: THREE.Mesh[] = [];
   for (const [x, z] of [[-w.x, w.zFront], [w.x, w.zFront], [-w.x, w.zRear], [w.x, w.zRear]]) {
     const wm = new THREE.Mesh(wheelGeo, wheelMat);
     wm.position.set(x, w.r, z);
     wm.castShadow = true;
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(w.r * 0.55, w.r * 0.55, w.width + 0.02, 8).rotateZ(Math.PI / 2), mat('#d9dce8'));
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(w.r * 0.55, w.r * 0.55, w.width + 0.02, 10).rotateZ(Math.PI / 2), mat('#d9dce8'));
     wm.add(cap);
     root.add(wm);
     wheels.push(wm);
   }
+
+  // 차체 아래 어두운 하부: 바퀴와 차체 사이 틈을 가려 땅에 붙어 보이게 한다
+  const skirt = part(new THREE.BoxGeometry(b.w * 0.86, 0.22, b.l * 0.8), '#3b3748');
+  skirt.position.set(0, b.y - b.h / 2 + 0.02, 0);
+  root.add(skirt);
+  // 앞 그릴, 뒤 트림, 배기구
+  const grille = part(new THREE.BoxGeometry(b.w * 0.36, b.h * 0.22, 0.05), '#4a4658');
+  grille.position.set(0, lampY - 0.02, -halfL + 0.01);
+  root.add(grille);
+  const trim = part(new THREE.BoxGeometry(b.w * 0.42, 0.05, 0.05), '#f1eff6');
+  trim.position.set(0, lampY, halfL + 0.0);
+  root.add(trim);
+  const exhaust = part(new THREE.CylinderGeometry(0.06, 0.06, 0.2, 8).rotateX(Math.PI / 2), '#8d8a99');
+  exhaust.position.set(b.w * 0.3, bumperY - 0.06, halfL + 0.05);
+  root.add(exhaust);
 
   const plate = part(new THREE.BoxGeometry(0.5, 0.18, 0.04), '#f7d86a');
   plate.position.set(0, b.y - b.h * 0.2, halfL + 0.03);

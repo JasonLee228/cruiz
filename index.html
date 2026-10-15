@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#f2b880" />
+    <title>Cruiz</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+
+    <div id="hud" hidden>
+      <div class="stat"><span id="hud-speed">0</span><small>km/h</small></div>
+      <div class="stat"><span id="hud-distance">0.0</span><small>km</small></div>
+      <div id="hud-mode" class="badge" hidden>AUTO</div>
+    </div>
+
+    <div id="start">
+      <h1>Cruiz</h1>
+      <p>목적지 없이, 그냥 달려요.</p>
+      <button id="start-button" type="button">출발</button>
+      <ul class="keys">
+        <li><kbd>←</kbd><kbd>→</kbd> 핸들</li>
+        <li><kbd>↑</kbd><kbd>↓</kbd> 속도</li>
+        <li><kbd>A</kbd> 자동 주행</li>
+        <li><kbd>C</kbd> 카메라</li>
+      </ul>
+      <p class="touch-hint">화면 왼쪽/오른쪽을 눌러 핸들을 돌려요</p>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

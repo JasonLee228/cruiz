@@ -307,7 +307,6 @@ function buildScenery(group: THREE.Group, z0: number, index: number, rand: () =>
 
   buildWater(group, z0);
   if (index % 5 === 2) buildVillage(group, z0, rand);
-  if (index % 9 === 4) buildLighthouse(group, z0, rand);
   buildBoats(group, z0, rand);
 }
 
@@ -431,27 +430,6 @@ function buildVillage(group: THREE.Group, z0: number, rand: () => number): void 
     house.rotation.y = rand() * Math.PI;
         group.add(house);
   }
-}
-
-function buildLighthouse(group: THREE.Group, z0: number, rand: () => number): void {
-  const z = z0 - 20 - rand() * 40;
-  const x = roadX(z) + 90 + rand() * 40;
-  const wl = waterY(z);
-  const light = new THREE.Group();
-  const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(9, 0), rockMaterial);
-  rock.scale.set(1.3, 0.7, 1.1);
-  rock.position.y = 0;
-  const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.4, 16, 8), whiteMaterial);
-  tower.position.y = 11;
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.0, 3, 8), redMaterial);
-  band.position.y = 11;
-  const lamp = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, 2.2, 8), lampGlowMaterial);
-  lamp.position.y = 20;
-  const cap = new THREE.Mesh(new THREE.ConeGeometry(2.3, 2.4, 8), redMaterial);
-  cap.position.y = 22.4;
-  light.add(rock, tower, band, lamp, cap);
-  light.position.set(x, wl + 1.5, z);
-  group.add(light);
 }
 
 function buildBoats(group: THREE.Group, z0: number, rand: () => number): void {

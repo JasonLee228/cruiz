@@ -221,14 +221,19 @@ export function buildCar(spec: CarSpec): CarModel {
     root.add(stripe);
   }
 
-  const wheelGeo = new THREE.CylinderGeometry(w.r, w.r, w.width, 14).rotateZ(Math.PI / 2);
-  const wheelMat = new THREE.MeshLambertMaterial({ color: '#2b2733', flatShading: true });
+  const wheelGeo = new THREE.CylinderGeometry(w.r, w.r, w.width, 28).rotateZ(Math.PI / 2);
+  // 바퀴는 매끈하게 음영을 줘야 굴러갈 때 각져 보이지 않는다
+  const wheelMat = new THREE.MeshLambertMaterial({ color: '#2b2733' });
+  const capGeo = new THREE.CylinderGeometry(w.r * 0.55, w.r * 0.55, w.width + 0.02, 20).rotateZ(Math.PI / 2);
+  const capMat = new THREE.MeshLambertMaterial({ color: '#d9dce8' });
   const wheels: THREE.Mesh[] = [];
   for (const [x, z] of [[-w.x, w.zFront], [w.x, w.zFront], [-w.x, w.zRear], [w.x, w.zRear]]) {
     const wm = new THREE.Mesh(wheelGeo, wheelMat);
     wm.position.set(x, w.r, z);
     wm.castShadow = true;
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(w.r * 0.55, w.r * 0.55, w.width + 0.02, 10).rotateZ(Math.PI / 2), mat('#d9dce8'));
+    // 조향(y) 후에 회전(x)이 적용되도록 순서를 바꾼다. 기본 순서면 핸들을 꺾을 때 바퀴축이 흔들린다.
+    wm.rotation.order = 'YXZ';
+    const cap = new THREE.Mesh(capGeo, capMat);
     wm.add(cap);
     root.add(wm);
     wheels.push(wm);

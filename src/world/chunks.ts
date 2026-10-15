@@ -4,7 +4,7 @@ import { ROAD_HALF_WIDTH, roadDX, roadX, roadY, terrainY, waterY } from './path'
 import { mulberry32 } from './random';
 
 const CHUNK_LENGTH = 80;
-const CHUNKS_AHEAD = 9;
+const CHUNKS_AHEAD = 7;
 const CHUNKS_BEHIND = 2;
 const TERRAIN_HALF_WIDTH = 220;
 const TERRAIN_COLS = 44;
@@ -54,8 +54,9 @@ function foliage(parts: THREE.BufferGeometry[], bottom: number, top: number): TH
   merged.computeVertexNormals();
   return merged;
 }
-const blob = (r: number, x: number, y: number, z: number, sy = 1) =>
-  new THREE.IcosahedronGeometry(r, 1).scale(1, sy, 1).translate(x, y, z);
+// 큰 잎 덩어리만 세분하고 작은 것은 거칠게 두어 삼각형 수를 아낀다
+const blob = (r: number, x: number, y: number, z: number, sy = 1, detail = 0) =>
+  new THREE.IcosahedronGeometry(r, detail).scale(1, sy, 1).translate(x, y, z);
 // 소나무: 원뿔 세 단을 겹친다
 const pineGeometry = foliage([
   new THREE.ConeGeometry(1.8, 2.6, 7).translate(0, 2.4, 0),
@@ -64,7 +65,7 @@ const pineGeometry = foliage([
 ], 1.2, 5.6);
 // 활엽수: 크기가 다른 잎 덩어리 네 개
 const roundTreeGeometry = foliage([
-  blob(1.6, 0, 3.0, 0, 0.9),
+  blob(1.6, 0, 3.0, 0, 0.9, 1),
   blob(1.15, 0.95, 3.6, 0.3),
   blob(1.1, -0.85, 3.5, -0.35),
   blob(1.0, 0.1, 4.3, -0.2),
@@ -298,8 +299,7 @@ function buildVillage(group: THREE.Group, z0: number, rand: () => number): void 
     house.add(body, roof);
     house.position.set(x, y, z);
     house.rotation.y = rand() * Math.PI;
-    house.traverse((o) => { if (o instanceof THREE.Mesh) { o.castShadow = true; o.userData.shared = false; } });
-    group.add(house);
+        group.add(house);
   }
 }
 
@@ -321,7 +321,6 @@ function buildLighthouse(group: THREE.Group, z0: number, rand: () => number): vo
   cap.position.y = 22.4;
   light.add(rock, tower, band, lamp, cap);
   light.position.set(x, wl + 1.5, z);
-  light.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = true; });
   group.add(light);
 }
 
@@ -366,13 +365,11 @@ function buildRoadside(group: THREE.Group, z0: number, z1: number): void {
       posts.setMatrixAt(i * 2 + k, m);
     });
   });
-  posts.castShadow = true;
   group.add(posts);
-  for (const g of rails) {
-    const mesh = new THREE.Mesh(g, railMaterial);
-    mesh.castShadow = true;
-    group.add(mesh);
-  }
+  const railMesh = new THREE.Mesh(mergeGeometries(rails), railMaterial);
+  rails.forEach((g) => g.dispose());
+  railMesh.castShadow = true;
+  group.add(railMesh);
 
   // 커브가 심하면 노란 다이아몬드 표지판, 일정 간격으로 가로등
   const zs = Math.floor(-z0 / 40);
@@ -415,9 +412,14 @@ class Chunk {
     const road = new THREE.Mesh(ribbon(z0, z1, -ROAD_HALF_WIDTH, ROAD_HALF_WIDTH, 0.02), roadMaterial);
     road.receiveShadow = true;
     this.group.add(road);
-    this.group.add(new THREE.Mesh(ribbon(z0, z1, -0.12, 0.12, 0.04, [4, 6]), lineMaterial));
-    this.group.add(new THREE.Mesh(ribbon(z0, z1, -ROAD_HALF_WIDTH + 0.3, -ROAD_HALF_WIDTH + 0.5, 0.04), lineMaterial));
-    this.group.add(new THREE.Mesh(ribbon(z0, z1, ROAD_HALF_WIDTH - 0.5, ROAD_HALF_WIDTH - 0.3, 0.04), lineMaterial));
+    // 중앙 점선과 양쪽 실선을 한 메쉬로
+    const lines = [
+      ribbon(z0, z1, -0.12, 0.12, 0.04, [4, 6]),
+      ribbon(z0, z1, -ROAD_HALF_WIDTH + 0.3, -ROAD_HALF_WIDTH + 0.5, 0.04),
+      ribbon(z0, z1, ROAD_HALF_WIDTH - 0.5, ROAD_HALF_WIDTH - 0.3, 0.04),
+    ];
+    this.group.add(new THREE.Mesh(mergeGeometries(lines), lineMaterial));
+    lines.forEach((g) => g.dispose());
 
     buildRoadside(this.group, z0, z1);
     buildScenery(this.group, z0, index, rand);

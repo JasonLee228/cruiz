@@ -6,13 +6,14 @@ import { ChunkManager, lineMaterial } from './world/chunks';
 import { Sky } from './world/sky';
 import { loadCarId, mountCarPicker } from './ui/carPicker';
 import { createPost } from './post';
+import { Quality } from './quality';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
 const sky = new Sky(scene);
@@ -22,6 +23,7 @@ scene.add(car.object);
 const rig = new CameraRig();
 const input = new Input(canvas);
 const post = createPost(renderer, scene, rig.camera);
+const quality = new Quality(renderer, post, sky.sun);
 
 const hud = document.getElementById('hud')!;
 const hudSpeed = document.getElementById('hud-speed')!;
@@ -93,7 +95,9 @@ const clock = new THREE.Clock();
 let elapsed = 0;
 
 function frame(): void {
-  const dt = Math.min(clock.getDelta(), 1 / 20);
+  const raw = clock.getDelta();
+  const dt = Math.min(raw, 1 / 20);
+  quality.update(raw);
   elapsed += dt;
 
   if (started) input.update();
@@ -115,6 +119,6 @@ function frame(): void {
 }
 
 // 테스트·스크린샷용 훅
-(window as unknown as { cruiz: unknown }).cruiz = { car, sky, rig, start };
+(window as unknown as { cruiz: unknown }).cruiz = { car, sky, rig, start, quality, renderer };
 
 requestAnimationFrame(frame);

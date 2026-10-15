@@ -39,6 +39,8 @@ export interface Post {
   resize(w: number, h: number): void;
   /** 밤에는 블룸을 키워 가로등·헤드라이트를 번지게 한다 */
   setNight(n: number): void;
+  /** false면 후처리 없이 바로 화면에 그린다 (저사양용) */
+  enabled: boolean;
 }
 
 export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Post {
@@ -52,18 +54,27 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   });
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(size, 0.25, 0.6, 1.0);
+  // 블룸은 절반 해상도로 계산해도 번짐이라 티가 나지 않는다
+  const bloom = new UnrealBloomPass(size.clone().multiplyScalar(0.5), 0.25, 0.6, 1.0);
   composer.addPass(bloom);
   const grade = new ShaderPass(GradeShader);
   composer.addPass(grade);
   composer.addPass(new OutputPass());
 
-  return {
-    render: (dt) => composer.render(dt),
-    resize: (w, h) => composer.setSize(w, h),
+  const post: Post = {
+    enabled: true,
+    render: (dt) => {
+      if (post.enabled) composer.render(dt);
+      else renderer.render(scene, camera);
+    },
+    resize: (w, h) => {
+      composer.setPixelRatio(renderer.getPixelRatio());
+      composer.setSize(w, h);
+    },
     setNight: (n) => {
       bloom.strength = 0.25 + n * 0.2;
       bloom.threshold = 1.0 - n * 0.05;
     },
   };
+  return post;
 }

@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { Car } from './car/car';
 import { CameraRig } from './car/camera';
 import { Input } from './input';
-import { ChunkManager } from './world/chunks';
+import { ChunkManager, lineMaterial } from './world/chunks';
 import { Sky } from './world/sky';
 import { loadCarId, mountCarPicker } from './ui/carPicker';
+import { createPost } from './post';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -20,6 +21,7 @@ const car = new Car(loadCarId() ?? undefined);
 scene.add(car.object);
 const rig = new CameraRig();
 const input = new Input(canvas);
+const post = createPost(renderer, scene, rig.camera);
 
 const hud = document.getElementById('hud')!;
 const hudSpeed = document.getElementById('hud-speed')!;
@@ -83,6 +85,7 @@ window.addEventListener('keydown', (e) => {
 
 window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
+  post.resize(window.innerWidth, window.innerHeight);
   rig.resize();
 });
 
@@ -104,7 +107,10 @@ function frame(): void {
   hudSpeed.textContent = Math.round(car.speed * 3.6).toString();
   hudDistance.textContent = (car.distance / 1000).toFixed(1);
 
-  renderer.render(scene, rig.camera);
+  post.setNight(sky.night);
+  // 차선은 조명을 받지 않는 재질이라, 밤에는 직접 어둡게 해 과하게 번지지 않게 한다
+  lineMaterial.color.setScalar(0.9 * (1 - sky.night * 0.5));
+  post.render(dt);
   requestAnimationFrame(frame);
 }
 

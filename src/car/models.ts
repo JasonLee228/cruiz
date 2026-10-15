@@ -156,7 +156,7 @@ export function buildCar(spec: CarSpec): CarModel {
   }
 
   const lampY = b.y + b.h * 0.15;
-  const lampMat = new THREE.MeshBasicMaterial({ color: '#fff4c2' });
+  const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#fff4c2').multiplyScalar(2.5) });
   const tail = new THREE.MeshBasicMaterial({ color: '#8a2a2a' });
   for (const x of [-b.w * 0.34, b.w * 0.34]) {
     const head = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.1, 10).rotateX(Math.PI / 2), lampMat);

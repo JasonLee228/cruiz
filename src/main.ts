@@ -7,10 +7,11 @@ import { loadScenery } from './world/assets';
 import { Sky } from './world/sky';
 import { loadCarId, mountCarPicker } from './ui/carPicker';
 import { createPost } from './post';
-import { Quality } from './quality';
+import { Quality, initialLevel } from './quality';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+// 낮음 화질로 저장돼 있으면 MSAA 없이 시작한다 (내장 그래픽에서 부담이 큼)
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: initialLevel() !== 'low' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
@@ -24,7 +25,7 @@ scene.add(car.object);
 const rig = new CameraRig();
 const input = new Input(canvas);
 const post = createPost(renderer, scene, rig.camera);
-const quality = new Quality(renderer, post, sky.sun);
+const quality = new Quality(renderer, post, sky.sun, world, sky.fog);
 
 // FPS 표시 (설정에서 켜고 끈다, 켠 상태는 저장)
 const fpsBox = document.getElementById('fps')!;

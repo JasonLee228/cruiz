@@ -5,11 +5,11 @@ import { mulberry32 } from './random';
 import { BARK, LEAF, scenery, type Variant } from './assets';
 
 const CHUNK_LENGTH = 80;
-const CHUNKS_AHEAD = 7;
 const CHUNKS_BEHIND = 2;
 const TERRAIN_HALF_WIDTH = 220;
 const TERRAIN_COLS = 44;
 const TERRAIN_ROWS = 12;
+const TERRAIN_COLUMN = (TERRAIN_HALF_WIDTH * 2) / TERRAIN_COLS;
 const ROAD_STEP = 2;
 
 const GRASS = ['#9fdc8a', '#8fd283', '#b3e594'].map((c) => new THREE.Color(c));
@@ -167,7 +167,11 @@ function buildTerrain(z0: number, rand: () => number): THREE.BufferGeometry {
     const isEdgeRow = Math.abs(Math.abs(lz) - CHUNK_LENGTH / 2) < 0.01;
     const jitter = isEdgeRow ? 0 : (rand() - 0.5) * 3;
     const x = center + pos.getX(i) + jitter;
-    pos.setXYZ(i, x, terrainY(x, z), z);
+    // 도로를 덮는 삼각형의 꼭짓점(가운데 열과 양옆 한 열)은 도로보다 살짝 낮춘다.
+    // 그러지 않으면 바다 쪽 곶이 솟는 곳에서 지형 면이 도로 위로 튀어나와 차선을 가린다.
+    let y = terrainY(x, z);
+    if (Math.abs(pos.getX(i)) <= TERRAIN_COLUMN * 1.2) y = Math.min(y, roadY(z) - 0.15);
+    pos.setXYZ(i, x, y, z);
   }
   const flat = g.toNonIndexed();
   g.dispose();
@@ -527,13 +531,15 @@ class Chunk {
 /** 차 앞쪽으로 청크를 만들고, 지나간 청크는 버린다. 메모리는 항상 일정하다. */
 export class ChunkManager {
   private chunks = new Map<number, Chunk>();
+  /** 앞쪽으로 만들어 둘 청크 수 (시야 거리). 화질 단계에 따라 바뀐다. */
+  ahead = 7;
 
   constructor(private scene: THREE.Scene) {}
 
   update(carZ: number): void {
     const current = Math.floor(-carZ / CHUNK_LENGTH);
     const min = current - CHUNKS_BEHIND;
-    const max = current + CHUNKS_AHEAD;
+    const max = current + this.ahead;
 
     for (const [index, chunk] of this.chunks) {
       if (index < min || index > max) {

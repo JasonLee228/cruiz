@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import { buildClassic } from './classic';
 
-export type CarId = 'hatch' | 'sports' | 'suv' | 'van';
+export type CarId = 'classic' | 'hatch' | 'sports' | 'suv' | 'van';
 
 export interface CarSpec {
   id: CarId;
@@ -19,6 +20,15 @@ export interface CarSpec {
 }
 
 export const CARS: CarSpec[] = [
+  {
+    // 시안의 주인공 차. 모양은 classic.ts에서 따로 만든다 (body/cabin 값은 쓰지 않음)
+    id: 'classic', name: '클래식', swatch: '#a6d8d4',
+    body: { w: 1.82, h: 0.65, l: 4.3, y: 0.62, color: '#a6d8d4' },
+    cabin: { w: 1.56, h: 0.57, l: 2.2, y: 1.24, z: 0.4, color: '#a6d8d4' },
+    glassColor: '#4b6a88',
+    wheel: { r: 0.36, width: 0.26, x: 0.76, zFront: -1.3, zRear: 1.3 },
+    maxSpeed: 33,
+  },
   {
     id: 'hatch', name: '해치백', swatch: '#e85d5d',
     body: { w: 1.9, h: 0.6, l: 4.1, y: 0.65, color: '#e85d5d' },
@@ -79,6 +89,7 @@ export interface CarModel {
 
 /** 로우폴리 차량. 박스와 원기둥 몇 개로 만든다. 앞바퀴는 wheels[0], wheels[1]. */
 export function buildCar(spec: CarSpec): CarModel {
+  if (spec.id === 'classic') return buildClassic(spec);
   const root = new THREE.Group();
   const { body: b, cabin: c, wheel: w } = spec;
   const halfL = b.l / 2;

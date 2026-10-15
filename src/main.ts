@@ -4,6 +4,7 @@ import { CameraRig } from './car/camera';
 import { Input } from './input';
 import { ChunkManager } from './world/chunks';
 import { Sky } from './world/sky';
+import { loadCarId, mountCarPicker } from './ui/carPicker';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -15,7 +16,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const sky = new Sky(scene);
 const world = new ChunkManager(scene);
-const car = new Car();
+const car = new Car(loadCarId() ?? undefined);
 scene.add(car.object);
 const rig = new CameraRig();
 const input = new Input(canvas);
@@ -26,6 +27,8 @@ const hudDistance = document.getElementById('hud-distance')!;
 const hudMode = document.getElementById('hud-mode')!;
 const startScreen = document.getElementById('start')!;
 const startButton = document.getElementById('start-button')!;
+
+mountCarPicker(document.getElementById('car-picker')!, (spec) => car.setType(spec));
 
 input.onToggleCamera = () => rig.next();
 input.onToggleAutopilot = (on) => (hudMode.hidden = !on);
@@ -45,6 +48,7 @@ function start(): void {
 }
 startButton.addEventListener('click', start);
 window.addEventListener('keydown', (e) => {
+  if ((e.target as HTMLElement).closest?.('#car-picker')) return;
   if (!started && (e.key === 'Enter' || e.key === ' ' || e.key.startsWith('Arrow'))) start();
 });
 

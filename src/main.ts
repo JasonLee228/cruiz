@@ -45,15 +45,20 @@ const GPU_NAME = (() => {
   return ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
 })();
 const SOFTWARE_GPU = /swiftshader|llvmpipe|software|basic render/i.test(GPU_NAME);
+// 'ANGLE (Intel, Intel(R) UHD Graphics 620 Direct3D11 ...)' → 'Intel(R) UHD Graphics 620'
+const GPU_SHORT = (GPU_NAME.match(/ANGLE \([^,]*, ([^,(]*(?:\([^)]*\)[^,(]*)*)/)?.[1] ?? GPU_NAME).replace(/^ANGLE \w+ Renderer: /, '').replace(/ (Direct3D|OpenGL|Vulkan|Metal).*$/, '').trim();
+fpsBox.title = GPU_NAME;
 let fpsFrames = 0;
 let fpsTime = 0;
+let cpuTime = 0; // 한 프레임에서 자바스크립트(CPU)가 쓴 시간 합. 프레임 시간과 비슷하면 CPU가 병목
 function updateFps(raw: number): void {
   fpsFrames++;
   fpsTime += raw;
   if (fpsTime < 0.5) return;
-  if (!fpsBox.hidden) fpsBox.textContent = `${Math.round(fpsFrames / fpsTime)} fps · 화질 ${QUALITY_LABEL[quality.level]}${SOFTWARE_GPU ? ' · 그래픽 가속 꺼짐' : ''}`;
+  if (!fpsBox.hidden) fpsBox.textContent = `${Math.round(fpsFrames / fpsTime)} fps · CPU ${(cpuTime / fpsFrames).toFixed(1)}ms · 화질 ${QUALITY_LABEL[quality.level]}${SOFTWARE_GPU ? ' · 그래픽 가속 꺼짐' : GPU_SHORT ? ` · ${GPU_SHORT}` : ''}`;
   fpsFrames = 0;
   fpsTime = 0;
+  cpuTime = 0;
 }
 
 const hud = document.getElementById('hud')!;
@@ -126,6 +131,7 @@ const clock = new THREE.Clock();
 let elapsed = 0;
 
 function frame(): void {
+  const cpuStart = performance.now();
   const raw = clock.getDelta();
   const dt = Math.min(raw, 1 / 20);
   quality.update(raw);
@@ -147,6 +153,7 @@ function frame(): void {
   // 차선은 조명을 받지 않는 재질이라, 밤에는 직접 어둡게 해 과하게 번지지 않게 한다
   lineMaterial.color.setScalar(0.9 * (1 - sky.night * 0.5));
   post.render(dt);
+  cpuTime += performance.now() - cpuStart;
   // 자연 에셋(약 300KB)을 먼저 받고 시작한다. 실패해도 기본 모양으로 이어진다.
 loadScenery().finally(() => requestAnimationFrame(frame));
 }

@@ -7,7 +7,7 @@ import type { ChunkManager } from './world/chunks';
  * 고른 단계는 저장해 두고 다음 방문 때 그 단계부터 시작한다.
  *  - high: 후처리(블룸·색보정·MSAA), 픽셀 비율 최대 1.5
  *  - medium: 후처리 없이 바로 그림, 픽셀 비율 1
- *  - low: 내장 그래픽용. 그림자 끔, 렌더 픽셀 수 상한, 시야 거리 단축, MSAA 끔(다음 방문부터)
+ *  - low: 내장 그래픽용. 그림자 끔, 시야 거리 단축, MSAA 끔(다음 방문부터)
  */
 const LEVELS = ['high', 'medium', 'low'] as const;
 type Level = (typeof LEVELS)[number];
@@ -49,10 +49,8 @@ export class Quality {
     const dpr = window.devicePixelRatio || 1;
     const w = window.innerWidth;
     const h = window.innerHeight;
-    let ratio = this.level === 'high' ? Math.min(dpr, 1.5) : Math.min(dpr, 1);
-    // 큰 화면에서도 그리는 픽셀 수가 넘치지 않게 상한을 둔다 (중간 약 150만, 낮음 약 60만)
-    const maxPixels = this.level === 'high' ? Infinity : this.level === 'medium' ? 1.5e6 : 6e5;
-    ratio = Math.min(ratio, Math.sqrt(maxPixels / (w * h)));
+    // 픽셀 수를 줄여도 내장 그래픽 fps가 거의 오르지 않고 화면만 흐려져서, 낮음도 원래 해상도로 그린다
+    const ratio = this.level === 'high' ? Math.min(dpr, 1.5) : Math.min(dpr, 1);
     this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(w, h);
     this.post.enabled = this.level === 'high';

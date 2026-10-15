@@ -17,7 +17,7 @@ const CLIFF = new THREE.Color('#e3d3b4');
 
 const terrainMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 const roadMaterial = new THREE.MeshLambertMaterial({ color: '#7e8197' });
-const lineMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff' });
+export const lineMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff' });
 const trunkMaterial = new THREE.MeshLambertMaterial({ color: '#7a5235', flatShading: true });
 const leafMaterial = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true });
 const railMaterial = new THREE.MeshLambertMaterial({ color: '#dfe3ee', flatShading: true, side: THREE.DoubleSide });

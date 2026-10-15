@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /** 하루 한 바퀴 (초). 4분이면 노을과 밤을 금방 만난다. */
 const DAY_LENGTH = 240;
@@ -54,7 +55,7 @@ export class Sky {
     scene.background = this.background;
 
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(1024, 1024);
     const cam = this.sun.shadow.camera;
     cam.left = -45; cam.right = 45; cam.top = 45; cam.bottom = -45; cam.near = 1; cam.far = 260;
     this.sun.shadow.bias = -0.0005;
@@ -103,8 +104,11 @@ export class Sky {
   }
 
   private buildMountains(): void {
+    // 산과 눈덮인 꼭대기를 각각 한 메쉬로 합쳐 그리기 호출을 줄인다
     this.mountainMaterial = new THREE.MeshLambertMaterial({ color: '#a7b6dc', flatShading: true, fog: false });
     const snow = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true, fog: false });
+    const peaks: THREE.BufferGeometry[] = [];
+    const caps: THREE.BufferGeometry[] = [];
     for (let i = 0; i < 30; i++) {
       const a = (i / 30) * Math.PI * 2 + Math.random() * 0.2;
       const h = 70 + Math.random() * 130;
@@ -113,36 +117,38 @@ export class Sky {
       const rot = Math.random() * Math.PI;
       const x = Math.cos(a) * 780;
       const z = Math.sin(a) * 780;
-      const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, sides), this.mountainMaterial);
-      m.position.set(x, h / 2 - 25, z);
-      m.rotation.y = rot;
-      this.mountains.add(m);
+      peaks.push(new THREE.ConeGeometry(r, h, sides).rotateY(rot).translate(x, h / 2 - 25, z).toNonIndexed());
       if (h > 120) {
-        const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 0.3 * 1.06, h * 0.3 * 1.02, sides), snow);
-        cap.position.set(x, h - 25 - h * 0.15, z);
-        cap.rotation.y = rot;
-        this.mountains.add(cap);
+        caps.push(new THREE.ConeGeometry(r * 0.3 * 1.06, h * 0.3 * 1.02, sides).rotateY(rot).translate(x, h - 25 - h * 0.15, z).toNonIndexed());
       }
     }
+    this.mountains.add(new THREE.Mesh(mergeGeometries(peaks), this.mountainMaterial));
+    if (caps.length) this.mountains.add(new THREE.Mesh(mergeGeometries(caps), snow));
   }
 
   private buildClouds(): void {
-    const mat = this.cloudMaterial;
+    // 구름 조각을 모두 한 InstancedMesh로 그린다 (조각마다 그리기 호출이 생기지 않게)
     const geo = new THREE.IcosahedronGeometry(1, 1);
+    const puffs: THREE.Matrix4[] = [];
+    const q = new THREE.Quaternion();
     for (let i = 0; i < 18; i++) {
-      const cloud = new THREE.Group();
-      const puffs = 3 + Math.floor(Math.random() * 3);
-      for (let j = 0; j < puffs; j++) {
-        const p = new THREE.Mesh(geo, mat);
-        p.scale.set(14 + Math.random() * 10, 7 + Math.random() * 5, 12 + Math.random() * 8);
-        p.position.set(j * 16 - puffs * 8, Math.random() * 4, Math.random() * 8);
-        cloud.add(p);
-      }
       const a = Math.random() * Math.PI * 2;
       const r = 200 + Math.random() * 380;
-      cloud.position.set(Math.cos(a) * r, 80 + Math.random() * 50, Math.sin(a) * r);
-      this.clouds.add(cloud);
+      const cx = Math.cos(a) * r;
+      const cy = 80 + Math.random() * 50;
+      const cz = Math.sin(a) * r;
+      const n = 3 + Math.floor(Math.random() * 3);
+      for (let j = 0; j < n; j++) {
+        puffs.push(new THREE.Matrix4().compose(
+          new THREE.Vector3(cx + j * 16 - n * 8, cy + Math.random() * 4, cz + Math.random() * 8),
+          q,
+          new THREE.Vector3(14 + Math.random() * 10, 7 + Math.random() * 5, 12 + Math.random() * 8),
+        ));
+      }
     }
+    const mesh = new THREE.InstancedMesh(geo, this.cloudMaterial, puffs.length);
+    puffs.forEach((m, i) => mesh.setMatrixAt(i, m));
+    this.clouds.add(mesh);
   }
 
   private buildStars(): THREE.Points {

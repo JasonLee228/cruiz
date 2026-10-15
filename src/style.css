@@ -68,8 +68,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 #start-button:hover { transform: translateY(-2px); }
 #start-button:active { transform: translateY(1px); }
-#car-select-slot:empty { display: none; }
-#car-select-slot { margin-top: 24px; }
+
 
 .keys { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; padding: 0; margin: 0; font-size: 14px; }
 kbd {
@@ -99,3 +98,12 @@ kbd {
   .nav-link { display: none; }
   #start { align-items: flex-end; padding-bottom: 14vh; }
 }
+
+#car-picker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.car-option {
+  display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 2px solid transparent;
+  border-radius: 999px; font-size: 15px; font-weight: 700;
+  background: var(--glass); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.car-option i { width: 14px; height: 14px; border-radius: 4px; background: var(--c); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5); }
+.car-option[aria-checked='true'] { border-color: var(--accent); background: rgba(30, 30, 70, 0.4); }

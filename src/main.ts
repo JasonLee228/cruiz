@@ -130,10 +130,10 @@ function frame(): void {
   car.update(dt, input.state);
   world.update(car.z);
   sky.update(dt, car.object.position);
+  landmarks.update(car.z, sky.night);
   syncTheme();
   car.setNight(sky.night);
   rig.update(dt, car, elapsed);
-  landmarks.update(car.z, rig.camera.position, sky.fog.color, sky.night);
 
   hudSpeed.textContent = Math.round(car.speed * 3.6).toString();
   hudDistance.textContent = (car.distance / 1000).toFixed(1);

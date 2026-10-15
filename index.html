@@ -7,8 +7,32 @@
     <title>Cruiz</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
+  <body data-phase="day">
     <canvas id="scene"></canvas>
+
+    <header id="topbar">
+      <a class="logo" href="/" aria-label="Cruiz">Cruiz</a>
+      <nav>
+        <button type="button" class="nav-link" data-theme-set="day">Day</button>
+        <button type="button" class="nav-link" data-theme-set="sunset">Sunset</button>
+        <button type="button" class="nav-link" data-theme-set="night">Night</button>
+        <button type="button" id="btn-sound" class="icon-btn" aria-label="소리" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" id="btn-settings" class="icon-btn" aria-label="설정" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.4h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
+        </button>
+      </nav>
+      <div id="settings-panel" hidden>
+        <ul class="keys">
+          <li><kbd>←</kbd><kbd>→</kbd> 핸들</li>
+          <li><kbd>↑</kbd><kbd>↓</kbd> 속도</li>
+          <li><kbd>A</kbd> 자동 주행</li>
+          <li><kbd>C</kbd> 카메라</li>
+        </ul>
+        <p class="touch-hint">화면 왼쪽/오른쪽을 눌러 핸들을 돌려요</p>
+      </div>
+    </header>
 
     <div id="hud" hidden>
       <div class="stat"><span id="hud-speed">0</span><small>km/h</small></div>
@@ -16,18 +40,15 @@
       <div id="hud-mode" class="badge" hidden>AUTO</div>
     </div>
 
-    <div id="start">
-      <h1>Cruiz</h1>
-      <p>목적지 없이, 그냥 달려요.</p>
-      <button id="start-button" type="button">출발</button>
-      <ul class="keys">
-        <li><kbd>←</kbd><kbd>→</kbd> 핸들</li>
-        <li><kbd>↑</kbd><kbd>↓</kbd> 속도</li>
-        <li><kbd>A</kbd> 자동 주행</li>
-        <li><kbd>C</kbd> 카메라</li>
-      </ul>
-      <p class="touch-hint">화면 왼쪽/오른쪽을 눌러 핸들을 돌려요</p>
-    </div>
+    <main id="start">
+      <section class="hero">
+        <h1 id="hero-title">Just Drive</h1>
+        <p id="hero-sub">Beautiful roads, brighter days.</p>
+        <button id="start-button" type="button">Start Driving <span aria-hidden="true">→</span></button>
+        <!-- 차 종류 선택 UI가 들어갈 자리 -->
+        <div id="car-select-slot"></div>
+      </section>
+    </main>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

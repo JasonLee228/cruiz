@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ROAD_HALF_WIDTH, roadDX, roadX, roadY, terrainY } from './path';
+import { ROAD_HALF_WIDTH, roadDX, roadX, roadY, terrainY, waterY } from './path';
 import { mulberry32 } from './random';
 
 const CHUNK_LENGTH = 80;
@@ -10,24 +10,32 @@ const TERRAIN_COLS = 44;
 const TERRAIN_ROWS = 12;
 const ROAD_STEP = 2;
 
-const GRASS = [new THREE.Color('#7fb069'), new THREE.Color('#6a9c5a'), new THREE.Color('#93bf6e')];
-const HILL = new THREE.Color('#5d8a55');
-const SAND = new THREE.Color('#d9c27a');
+const GRASS = ['#9fdc8a', '#8fd283', '#b3e594'].map((c) => new THREE.Color(c));
+const HILL = new THREE.Color('#6fbf7a');
+const SAND = new THREE.Color('#f2e2b4');
+const CLIFF = new THREE.Color('#e3d3b4');
 
 const terrainMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-const roadMaterial = new THREE.MeshLambertMaterial({ color: '#4a4658' });
-const lineMaterial = new THREE.MeshBasicMaterial({ color: '#fff3d6' });
+const roadMaterial = new THREE.MeshLambertMaterial({ color: '#7e8197' });
+const lineMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff' });
 const trunkMaterial = new THREE.MeshLambertMaterial({ color: '#7a5235', flatShading: true });
 const leafMaterial = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true });
-const railMaterial = new THREE.MeshLambertMaterial({ color: '#c9ccd6', flatShading: true, side: THREE.DoubleSide });
-const postMaterial = new THREE.MeshLambertMaterial({ color: '#8a8d9c', flatShading: true });
+const railMaterial = new THREE.MeshLambertMaterial({ color: '#dfe3ee', flatShading: true, side: THREE.DoubleSide });
+const postMaterial = new THREE.MeshLambertMaterial({ color: '#aab0c4', flatShading: true });
 const signMaterial = new THREE.MeshLambertMaterial({ color: '#f2c14e', flatShading: true });
 const lampGlowMaterial = new THREE.MeshBasicMaterial({ color: '#ffe3a0', fog: false });
-const rockMaterial = new THREE.MeshLambertMaterial({ color: '#9a96a6', flatShading: true });
+const rockMaterial = new THREE.MeshLambertMaterial({ color: '#c9c2d4', flatShading: true });
+const cliffMaterial = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true });
+const waterMaterial = new THREE.MeshLambertMaterial({ color: '#4cc3dd', flatShading: true, transparent: true, opacity: 0.92 });
+const wallMaterials = ['#fff1dc', '#ffd9c2', '#d9ecf7', '#fbe3a8'].map((c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true }));
+const roofMaterials = ['#ee8b72', '#e57a8a', '#f2a65a'].map((c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true }));
+const whiteMaterial = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true });
+const redMaterial = new THREE.MeshLambertMaterial({ color: '#e8606a', flatShading: true });
 
 const trunkGeometry = new THREE.CylinderGeometry(0.25, 0.35, 1.6, 5).translate(0, 0.8, 0);
 const pineGeometry = new THREE.ConeGeometry(1.6, 4.2, 6).translate(0, 3.4, 0);
-const roundTreeGeometry = new THREE.IcosahedronGeometry(1.7, 0).translate(0, 2.9, 0);
+const roundTreeGeometry = new THREE.IcosahedronGeometry(1.8, 1).translate(0, 3.0, 0);
+const bushGeometry = new THREE.IcosahedronGeometry(0.9, 1).scale(1.2, 0.8, 1.1).translate(0, 0.5, 0);
 const postGeometry = new THREE.BoxGeometry(0.16, 0.9, 0.16).translate(0, 0.45, 0);
 const signGeometry = new THREE.BoxGeometry(1.3, 1.3, 0.12).rotateZ(Math.PI / 4).translate(0, 2.6, 0);
 const signPoleGeometry = new THREE.CylinderGeometry(0.06, 0.06, 2, 5).translate(0, 1, 0);
@@ -35,7 +43,8 @@ const lampPoleGeometry = new THREE.CylinderGeometry(0.07, 0.1, 5.4, 5).translate
 const lampGlowGeometry = new THREE.IcosahedronGeometry(0.3, 0).translate(0, 5.5, 0);
 const rockGeometry = new THREE.DodecahedronGeometry(1, 0);
 
-const LEAF_COLORS = ['#3f7d4e', '#4f9a5a', '#2f6b48', '#e3a14b', '#d9734e'].map((c) => new THREE.Color(c));
+const PINE_COLORS = ['#4fae78', '#5cbd82', '#3f9a6c'].map((c) => new THREE.Color(c));
+const LEAF_COLORS = ['#7ad183', '#66c47a', '#92dc86', '#52b872', '#f4c26b', '#f2a07b'].map((c) => new THREE.Color(c));
 
 /** 도로 중심에서 lateral 만큼 옆으로 떨어진 지점 (도로 진행 방향에 수직) */
 function roadPoint(z: number, lateral: number, lift: number, out: THREE.Vector3): THREE.Vector3 {
@@ -125,9 +134,13 @@ function buildTerrain(z0: number, rand: () => number): THREE.BufferGeometry {
     const d = Math.abs(cx - roadX(cz));
     const rise = cy - roadY(cz);
     if (d < ROAD_HALF_WIDTH + 3.5) color.copy(SAND);
+    else if (cy < waterY(cz) + 1.3) color.copy(SAND);
+    else if (cx > roadX(cz) && rise < -1.5) color.copy(CLIFF).lerp(SAND, 0.4);
     else {
       color.copy(GRASS[Math.floor(rand() * GRASS.length)]);
-      color.lerp(HILL, Math.min(Math.max(rise / 14, 0), 1));
+      color.lerp(HILL, Math.min(Math.max(rise / 20, 0), 1));
+      // 같은 풀밭도 면마다 조금씩 밝기를 달리해 포근한 질감을 낸다
+      color.offsetHSL(0, 0, (rand() - 0.5) * 0.04);
     }
     for (let k = 0; k < 3; k++) color.toArray(colors, (i + k) * 3);
   }
@@ -135,54 +148,160 @@ function buildTerrain(z0: number, rand: () => number): THREE.BufferGeometry {
   return flat;
 }
 
-function buildScenery(group: THREE.Group, z0: number, rand: () => number): void {
+function buildScenery(group: THREE.Group, z0: number, index: number, rand: () => number): void {
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const s = new THREE.Vector3();
   const p = new THREE.Vector3();
   const up = new THREE.Vector3(0, 1, 0);
 
-  type Item = { x: number; y: number; z: number; scale: number; rot: number; kind: 'pine' | 'round' | 'rock' };
+  type Kind = 'pine' | 'round' | 'rock' | 'bush' | 'cliff';
+  type Item = { x: number; y: number; z: number; scale: number; rot: number; kind: Kind };
   const items: Item[] = [];
-  const count = 70;
-  for (let i = 0; i < count; i++) {
+  const add = (z: number, x: number, scale: number, kind: Kind) => {
+    const y = terrainY(x, z);
+    if (y < waterY(z) + 1) return; // 물 속에는 심지 않는다
+    items.push({ x, y, z, scale, rot: rand() * Math.PI * 2, kind });
+  };
+  for (let i = 0; i < 80; i++) {
+    const z = z0 - rand() * CHUNK_LENGTH;
+    const side = rand() < 0.85 ? -1 : 1; // 왼쪽 숲이 더 빽빽, 오른쪽은 바다가 보이도록 듬성듬성
+    const offset = ROAD_HALF_WIDTH + (side < 0 ? 6 : 14) + Math.pow(rand(), 1.5) * 140;
+    const r = rand();
+    add(z, roadX(z) + side * offset, 0.8 + rand() * 1.0, r < 0.4 ? 'pine' : 'round');
+  }
+  for (let i = 0; i < 26; i++) {
     const z = z0 - rand() * CHUNK_LENGTH;
     const side = rand() < 0.5 ? -1 : 1;
-    // 도로 가까이는 듬성듬성, 멀수록 빽빽하게
-    const offset = ROAD_HALF_WIDTH + 6 + Math.pow(rand(), 1.6) * 150;
-    const x = roadX(z) + side * offset;
-    const r = rand();
-    const kind = r < 0.5 ? 'pine' : r < 0.85 ? 'round' : 'rock';
-    items.push({ x, y: terrainY(x, z), z, scale: 0.7 + rand() * 0.9, rot: rand() * Math.PI * 2, kind });
+    add(z, roadX(z) + side * (ROAD_HALF_WIDTH + (side < 0 ? 4 : 8) + rand() * 10), 0.7 + rand() * 0.9, 'bush');
+  }
+  // 왼쪽 길가의 연한 절벽 바위
+  const cliffCount = Math.floor(rand() * 5);
+  for (let i = 0; i < cliffCount; i++) {
+    const z = z0 - rand() * CHUNK_LENGTH;
+    add(z, roadX(z) - (ROAD_HALF_WIDTH + 12 + rand() * 20), 4 + rand() * 5, 'cliff');
+  }
+  for (let i = 0; i < 6; i++) {
+    const z = z0 - rand() * CHUNK_LENGTH;
+    add(z, roadX(z) + (rand() < 0.5 ? -1 : 1) * (ROAD_HALF_WIDTH + 6 + rand() * 30), 1 + rand(), 'rock');
   }
 
-  const trees = items.filter((it) => it.kind !== 'rock');
-  const pines = items.filter((it) => it.kind === 'pine');
-  const rounds = items.filter((it) => it.kind === 'round');
-  const rocks = items.filter((it) => it.kind === 'rock');
-
+  const by = (k: Kind) => items.filter((it) => it.kind === k);
+  const trees = items.filter((it) => it.kind === 'pine' || it.kind === 'round');
   const trunks = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, trees.length);
-  const pineMesh = new THREE.InstancedMesh(pineGeometry, leafMaterial, pines.length);
-  const roundMesh = new THREE.InstancedMesh(roundTreeGeometry, leafMaterial, rounds.length);
-  const rockMesh = new THREE.InstancedMesh(rockGeometry, rockMaterial, rocks.length);
-
-  const place = (mesh: THREE.InstancedMesh, list: Item[], withColor: boolean, extraScale = 1) => {
+  const place = (mesh: THREE.InstancedMesh, list: Item[], palette?: THREE.Color[], extraScale = 1, sink = 0) => {
     list.forEach((it, i) => {
       q.setFromAxisAngle(up, it.rot);
       s.setScalar(it.scale * extraScale);
-      p.set(it.x, it.y - (it.kind === 'rock' ? 0.3 : 0), it.z);
+      p.set(it.x, it.y - sink, it.z);
       m.compose(p, q, s);
       mesh.setMatrixAt(i, m);
-      if (withColor) mesh.setColorAt(i, LEAF_COLORS[Math.floor(rand() * (it.kind === 'pine' ? 3 : LEAF_COLORS.length))]);
+      if (palette) mesh.setColorAt(i, palette[Math.floor(rand() * palette.length)]);
     });
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     group.add(mesh);
   };
-  place(trunks, trees, false);
-  place(pineMesh, pines, true);
-  place(roundMesh, rounds, true);
-  place(rockMesh, rocks, false, 1.3);
+  const pines = by('pine');
+  const rounds = by('round');
+  const bushes = by('bush');
+  const rocks = by('rock');
+  const cliffs = by('cliff');
+  place(trunks, trees);
+  place(new THREE.InstancedMesh(pineGeometry, leafMaterial, pines.length), pines, PINE_COLORS);
+  place(new THREE.InstancedMesh(roundTreeGeometry, leafMaterial, rounds.length), rounds, LEAF_COLORS);
+  place(new THREE.InstancedMesh(bushGeometry, leafMaterial, bushes.length), bushes, LEAF_COLORS);
+  place(new THREE.InstancedMesh(rockGeometry, rockMaterial, rocks.length), rocks, undefined, 1.3, 0.3);
+  place(new THREE.InstancedMesh(rockGeometry, cliffMaterial, cliffs.length), cliffs, [CLIFF, CLIFF.clone().offsetHSL(0, 0, 0.04)], 1, 1.5);
+
+  buildWater(group, z0);
+  if (index % 5 === 2) buildVillage(group, z0, rand);
+  if (index % 9 === 4) buildLighthouse(group, z0, rand);
+  buildBoats(group, z0, rand);
+}
+
+/** 오른쪽 바다. 도로를 따라 수면 높이가 오르내린다. */
+function buildWater(group: THREE.Group, z0: number): void {
+  const rows = 8;
+  const positions: number[] = [];
+  const pt = (z: number, x: number) => [x, waterY(z), z];
+  for (let r = 0; r < rows; r++) {
+    const za = z0 - (r / rows) * CHUNK_LENGTH;
+    const zb = z0 - ((r + 1) / rows) * CHUNK_LENGTH;
+    const xa0 = roadX(za) + 8, xa1 = roadX(za) + 700;
+    const xb0 = roadX(zb) + 8, xb1 = roadX(zb) + 700;
+    positions.push(...pt(za, xa0), ...pt(za, xa1), ...pt(zb, xb0));
+    positions.push(...pt(za, xa1), ...pt(zb, xb1), ...pt(zb, xb0));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, waterMaterial);
+  mesh.receiveShadow = true;
+  group.add(mesh);
+}
+
+function buildVillage(group: THREE.Group, z0: number, rand: () => number): void {
+  const bodyGeo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+  const roofGeo = new THREE.ConeGeometry(0.85, 0.7, 4).rotateY(Math.PI / 4).translate(0, 1.35, 0);
+  for (let i = 0; i < 9; i++) {
+    const z = z0 - 8 - rand() * (CHUNK_LENGTH - 16);
+    const x = roadX(z) + (rand() < 0.5 ? 1 : -1) * (ROAD_HALF_WIDTH + 20 + rand() * 30);
+    const y = terrainY(x, z);
+    if (y < waterY(z) + 1.2) continue;
+    const w = 3 + rand() * 2.5;
+    const h = 2.4 + rand() * 1.6;
+    const house = new THREE.Group();
+    const body = new THREE.Mesh(bodyGeo, wallMaterials[Math.floor(rand() * wallMaterials.length)]);
+    body.scale.set(w, h, w * (0.8 + rand() * 0.5));
+    const roof = new THREE.Mesh(roofGeo, roofMaterials[Math.floor(rand() * roofMaterials.length)]);
+    roof.scale.set(w * 1.35, h * 0.55, w * 1.2);
+    roof.position.y = h - 1.35 + 1.35 * (h * 0.55) - 0.7;
+    house.add(body, roof);
+    house.position.set(x, y, z);
+    house.rotation.y = rand() * Math.PI;
+    house.traverse((o) => { if (o instanceof THREE.Mesh) { o.castShadow = true; o.userData.shared = false; } });
+    group.add(house);
+  }
+}
+
+function buildLighthouse(group: THREE.Group, z0: number, rand: () => number): void {
+  const z = z0 - 20 - rand() * 40;
+  const x = roadX(z) + 90 + rand() * 40;
+  const wl = waterY(z);
+  const light = new THREE.Group();
+  const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(9, 0), rockMaterial);
+  rock.scale.set(1.3, 0.7, 1.1);
+  rock.position.y = 0;
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.4, 16, 8), whiteMaterial);
+  tower.position.y = 11;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.0, 3, 8), redMaterial);
+  band.position.y = 11;
+  const lamp = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, 2.2, 8), lampGlowMaterial);
+  lamp.position.y = 20;
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(2.3, 2.4, 8), redMaterial);
+  cap.position.y = 22.4;
+  light.add(rock, tower, band, lamp, cap);
+  light.position.set(x, wl + 1.5, z);
+  light.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = true; });
+  group.add(light);
+}
+
+function buildBoats(group: THREE.Group, z0: number, rand: () => number): void {
+  const hullGeo = new THREE.BoxGeometry(1.4, 0.5, 4);
+  const sailGeo = new THREE.ConeGeometry(1.4, 5, 3).translate(0, 2.8, 0);
+  const n = 2 + Math.floor(rand() * 3);
+  for (let i = 0; i < n; i++) {
+    const z = z0 - rand() * CHUNK_LENGTH;
+    const x = roadX(z) + 60 + rand() * 200;
+    if (terrainY(x, z) > waterY(z) - 1) continue;
+    const boat = new THREE.Group();
+    boat.add(new THREE.Mesh(hullGeo, redMaterial), new THREE.Mesh(sailGeo, whiteMaterial));
+    boat.position.set(x, waterY(z) + 0.2, z);
+    boat.rotation.y = rand() * Math.PI;
+    boat.scale.setScalar(1.6 + rand() * 1.4);
+    group.add(boat);
+  }
 }
 
 /** 도로 양옆 가드레일(레일 + 기둥), 급커브 표지판, 가로등 */
@@ -263,7 +382,7 @@ class Chunk {
     this.group.add(new THREE.Mesh(ribbon(z0, z1, ROAD_HALF_WIDTH - 0.5, ROAD_HALF_WIDTH - 0.3, 0.04), lineMaterial));
 
     buildRoadside(this.group, z0, z1);
-    buildScenery(this.group, z0, rand);
+    buildScenery(this.group, z0, index, rand);
   }
 
   dispose(): void {

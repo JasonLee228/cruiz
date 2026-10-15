@@ -10,7 +10,7 @@ body[data-phase='night'] { --accent: #b48cf5; --accent-text: #fff; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #f2b880; }
 body {
-  font-family: ui-rounded, 'SF Pro Rounded', 'Nunito', system-ui, -apple-system, sans-serif;
+  font-family: 'Plus Jakarta Sans', ui-rounded, 'SF Pro Rounded', 'Nunito', system-ui, -apple-system, sans-serif;
   color: #fff;
   -webkit-user-select: none;
   user-select: none;
@@ -107,3 +107,9 @@ kbd {
 }
 .car-option i { width: 14px; height: 14px; border-radius: 4px; background: var(--c); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5); }
 .car-option[aria-checked='true'] { border-color: var(--accent); background: rgba(30, 30, 70, 0.4); }
+
+/* 낮 시작 화면은 레퍼런스 01처럼 가운데 정렬 */
+body[data-phase='day'] #start { align-items: flex-start; justify-content: center; padding-top: 14vh; background: linear-gradient(180deg, rgba(40, 80, 140, 0.18), rgba(40, 80, 140, 0) 50%); }
+body[data-phase='day'] .hero { text-align: center; max-width: 720px; }
+body[data-phase='day'] #car-picker { justify-content: center; }
+.hero h1 { font-weight: 700; }

@@ -31,10 +31,24 @@ export function roadDY(z: number): number {
 }
 
 /** 도로 주변 지형 높이. 도로에서 멀수록 언덕이 솟는다. */
+/** 수면 높이. 도로를 따라 완만하게 오르내린다. */
+export function waterY(z: number): number {
+  return roadY(z) - 9;
+}
+
+/** 도로 오른쪽(+x)은 바다, 왼쪽은 산과 숲 */
 export function terrainY(x: number, z: number): number {
   const cx = roadX(z);
   const base = roadY(z);
   const d = Math.abs(x - cx);
+  if (x > cx) {
+    // 바다 쪽: 해안 절벽 → 물 속으로 내려간다. 가끔 곶이 솟는다.
+    const cape = Math.max(0, noise2(x / 60 + 11, z / 60 + 5) - 0.62) * 70;
+    const drop = Math.min(Math.max((d - 10) / 26, 0), 1);
+    const sea = waterY(z) - 5;
+    const land = base - 0.25;
+    return land + (sea - land) * drop * drop * (3 - 2 * drop) + cape * Math.min(d / 60, 1);
+  }
   const shoulder = ROAD_HALF_WIDTH + 2;
   const t = Math.min(Math.max((d - shoulder) / 40, 0), 1);
   const hills =

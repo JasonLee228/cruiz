@@ -5,6 +5,7 @@ const DAY_LENGTH = 240;
 
 interface Mood {
   sky: string;
+  top: string;
   fog: string;
   sun: string;
   sunIntensity: number;
@@ -14,17 +15,17 @@ interface Mood {
 
 // 시간 0 = 아침. 순서대로 보간하며 돈다.
 const MOODS: Mood[] = [
-  { sky: '#9fd3e6', fog: '#cfe6dc', sun: '#fff1d0', sunIntensity: 2.4, ambient: 1.1, night: 0 }, // 아침
-  { sky: '#7cc4e8', fog: '#bfe0e6', sun: '#ffffff', sunIntensity: 2.8, ambient: 1.2, night: 0 }, // 한낮
-  { sky: '#f2b880', fog: '#f5c9a0', sun: '#ffb070', sunIntensity: 2.0, ambient: 0.9, night: 0 }, // 노을
-  { sky: '#c0688a', fog: '#b8708e', sun: '#ff8a6a', sunIntensity: 0.9, ambient: 0.6, night: 0.5 }, // 해질녘
-  { sky: '#1d1f3d', fog: '#262850', sun: '#8fa0ff', sunIntensity: 0.35, ambient: 0.35, night: 1 }, // 밤
-  { sky: '#3a3866', fog: '#4b4878', sun: '#c7b0ff', sunIntensity: 0.6, ambient: 0.5, night: 0.7 }, // 새벽
+  { sky: '#bfe3f2', top: '#6fb6ea', fog: '#d3ebf2', sun: '#fff3d8', sunIntensity: 1.9, ambient: 1.7, night: 0 }, // 아침
+  { sky: '#c4e6f5', top: '#5aa9e6', fog: '#d6edf5', sun: '#ffffff', sunIntensity: 2.0, ambient: 1.8, night: 0 }, // 한낮
+  { sky: '#ffd0a8', top: '#a98ad6', fog: '#f9cfb3', sun: '#ffb88a', sunIntensity: 1.6, ambient: 1.4, night: 0 }, // 노을
+  { sky: '#f4a6b6', top: '#7a6bc2', fog: '#e9a8bc', sun: '#ff9a86', sunIntensity: 0.9, ambient: 1.0, night: 0.5 }, // 해질녘
+  { sky: '#4a4a8c', top: '#171a45', fog: '#3a3a78', sun: '#9fb0ff', sunIntensity: 0.7, ambient: 1.05, night: 1 }, // 밤
+  { sky: '#8a78c0', top: '#2b2c66', fog: '#6c5ea6', sun: '#d2bfff', sunIntensity: 0.8, ambient: 1.1, night: 0.7 }, // 새벽
 ];
 
 export class Sky {
   readonly sun = new THREE.DirectionalLight('#ffffff', 2.5);
-  readonly hemi = new THREE.HemisphereLight('#ffffff', '#5d7a4a', 1);
+  readonly hemi = new THREE.HemisphereLight('#ffffff', '#8fb27a', 1);
   readonly fog: THREE.Fog;
   readonly background = new THREE.Color();
   /** 0..1, 헤드라이트 켤 정도 */
@@ -36,10 +37,19 @@ export class Sky {
   private mountains = new THREE.Group();
   private stars: THREE.Points;
   private sunDisc: THREE.Mesh;
+  private dome: THREE.Mesh;
+  private domeUniforms = {
+    top: { value: new THREE.Color() },
+    bottom: { value: new THREE.Color() },
+    glow: { value: new THREE.Color() },
+    sunDir: { value: new THREE.Vector3(0.1, 0.2, -1) },
+    glowAmount: { value: 0 },
+  };
+  private mountainMaterial!: THREE.MeshLambertMaterial;
 
   constructor(scene: THREE.Scene, startTime = 0.08) {
     this.time = startTime;
-    this.fog = new THREE.Fog('#cfe6dc', 60, 520);
+    this.fog = new THREE.Fog('#d3ebf2', 70, 560);
     scene.fog = this.fog;
     scene.background = this.background;
 
@@ -57,7 +67,27 @@ export class Sky {
       new THREE.CircleGeometry(1, 32),
       new THREE.MeshBasicMaterial({ color: '#fff4c8', fog: false, depthWrite: false }),
     );
-    scene.add(this.mountains, this.clouds, this.stars, this.sunDisc);
+    this.dome = new THREE.Mesh(
+      new THREE.SphereGeometry(1300, 24, 16),
+      new THREE.ShaderMaterial({
+        uniforms: this.domeUniforms,
+        side: THREE.BackSide,
+        depthWrite: false,
+        fog: false,
+        vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+        fragmentShader: `varying vec3 vDir; uniform vec3 top; uniform vec3 bottom; uniform vec3 glow; uniform vec3 sunDir; uniform float glowAmount;
+          void main(){
+            float h = clamp(vDir.y, 0.0, 1.0);
+            vec3 c = mix(bottom, top, smoothstep(0.0, 0.55, h));
+            float g = pow(max(dot(normalize(vDir), normalize(sunDir)), 0.0), 6.0);
+            c += glow * g * glowAmount;
+            gl_FragColor = vec4(c, 1.0);
+            #include <colorspace_fragment>
+          }`,
+      }),
+    );
+    this.dome.renderOrder = -10;
+    scene.add(this.dome, this.mountains, this.clouds, this.stars, this.sunDisc);
   }
 
   /** UI 테마용: 지금이 낮 / 노을 / 밤 중 어디인지 */
@@ -73,20 +103,32 @@ export class Sky {
   }
 
   private buildMountains(): void {
-    const mat = new THREE.MeshLambertMaterial({ color: '#7d8fb0', flatShading: true, fog: false });
-    for (let i = 0; i < 26; i++) {
-      const a = (i / 26) * Math.PI * 2 + Math.random() * 0.2;
-      const h = 70 + Math.random() * 120;
-      const m = new THREE.Mesh(new THREE.ConeGeometry(70 + Math.random() * 70, h, 5 + Math.floor(Math.random() * 3)), mat);
-      m.position.set(Math.cos(a) * 780, h / 2 - 25, Math.sin(a) * 780);
-      m.rotation.y = Math.random() * Math.PI;
+    this.mountainMaterial = new THREE.MeshLambertMaterial({ color: '#a7b6dc', flatShading: true, fog: false });
+    const snow = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true, fog: false });
+    for (let i = 0; i < 30; i++) {
+      const a = (i / 30) * Math.PI * 2 + Math.random() * 0.2;
+      const h = 70 + Math.random() * 130;
+      const r = 70 + Math.random() * 70;
+      const sides = 5 + Math.floor(Math.random() * 3);
+      const rot = Math.random() * Math.PI;
+      const x = Math.cos(a) * 780;
+      const z = Math.sin(a) * 780;
+      const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, sides), this.mountainMaterial);
+      m.position.set(x, h / 2 - 25, z);
+      m.rotation.y = rot;
       this.mountains.add(m);
+      if (h > 120) {
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 0.3 * 1.06, h * 0.3 * 1.02, sides), snow);
+        cap.position.set(x, h - 25 - h * 0.15, z);
+        cap.rotation.y = rot;
+        this.mountains.add(cap);
+      }
     }
   }
 
   private buildClouds(): void {
     const mat = this.cloudMaterial;
-    const geo = new THREE.IcosahedronGeometry(1, 0);
+    const geo = new THREE.IcosahedronGeometry(1, 1);
     for (let i = 0; i < 18; i++) {
       const cloud = new THREE.Group();
       const puffs = 3 + Math.floor(Math.random() * 3);
@@ -98,7 +140,7 @@ export class Sky {
       }
       const a = Math.random() * Math.PI * 2;
       const r = 200 + Math.random() * 380;
-      cloud.position.set(Math.cos(a) * r, 110 + Math.random() * 60, Math.sin(a) * r);
+      cloud.position.set(Math.cos(a) * r, 80 + Math.random() * 50, Math.sin(a) * r);
       this.clouds.add(cloud);
     }
   }
@@ -125,6 +167,8 @@ export class Sky {
     const t = THREE.MathUtils.smoothstep(f - Math.floor(f), 0, 1);
 
     this.background.set(a.sky).lerp(new THREE.Color(b.sky), t);
+    this.domeUniforms.bottom.value.copy(this.background);
+    this.domeUniforms.top.value.set(a.top).lerp(new THREE.Color(b.top), t);
     this.fog.color.set(a.fog).lerp(new THREE.Color(b.fog), t);
     this.sun.color.set(a.sun).lerp(new THREE.Color(b.sun), t);
     this.sun.intensity = THREE.MathUtils.lerp(a.sunIntensity, b.sunIntensity, t);
@@ -132,7 +176,7 @@ export class Sky {
     this.hemi.color.copy(this.fog.color).lerp(new THREE.Color('#ffffff'), 0.5);
     this.night = THREE.MathUtils.lerp(a.night, b.night, t);
     // 구름 아랫면이 너무 어두워지지 않도록 하늘빛을 받아 은은하게 밝힌다.
-    this.cloudMaterial.emissive.copy(this.fog.color).multiplyScalar(0.55);
+    this.cloudMaterial.emissive.copy(this.fog.color).multiplyScalar(0.7);
     (this.stars.material as THREE.PointsMaterial).opacity = Math.max(0, this.night - 0.3) * 1.4;
 
     // 해는 하루 동안 하늘을 가로지른다. 그림자는 차 주변에만 드리운다.
@@ -146,6 +190,11 @@ export class Sky {
     this.sunDisc.position.set(focus.x + 120, Math.max(elev, -0.05) * 380 + 20, focus.z - 760);
     this.sunDisc.scale.setScalar(55 + (1 - Math.max(elev, 0)) * 30);
     (this.sunDisc.material as THREE.MeshBasicMaterial).color.copy(this.sun.color).lerp(new THREE.Color('#fff4c8'), 0.4);
+    this.domeUniforms.glow.value.copy(this.sun.color);
+    this.domeUniforms.glowAmount.value = 0.5 * (1 - Math.max(elev, 0) * 0.6) * (this.night > 0.8 ? 0.3 : 1);
+    this.domeUniforms.sunDir.value.set(120, this.sunDisc.position.y, -760);
+    this.mountainMaterial.color.set('#a7b6dc').lerp(this.fog.color, 0.45);
+    this.dome.position.set(focus.x, 0, focus.z);
     this.sunDisc.lookAt(focus.x, this.sunDisc.position.y, focus.z + 400);
 
     // 먼 배경은 차를 따라다녀 끝없이 멀리 있는 것처럼 보인다.

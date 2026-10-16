@@ -9,6 +9,7 @@ import { Landmarks } from './world/landmarks';
 import { loadCarId, mountCarPicker } from './ui/carPicker';
 import { createPost } from './post';
 import { Quality } from './quality';
+import { Sound } from './audio';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -27,6 +28,7 @@ const rig = new CameraRig();
 const input = new Input(canvas);
 const post = createPost(renderer, scene, rig.camera);
 const quality = new Quality(renderer, post, sky.sun);
+const sound = new Sound();
 
 // FPS 표시 (설정에서 켜고 끈다, 켠 상태는 저장)
 const fpsBox = document.getElementById('fps')!;
@@ -90,8 +92,12 @@ settingsBtn.addEventListener('click', () => {
   settingsPanel.hidden = !settingsPanel.hidden;
   settingsBtn.setAttribute('aria-expanded', String(!settingsPanel.hidden));
 });
-// 소리는 아직 없다. 버튼은 자리만 잡아 두고 상태만 토글한다.
-soundBtn.addEventListener('click', () => soundBtn.setAttribute('aria-pressed', String(soundBtn.getAttribute('aria-pressed') !== 'true')));
+// 소리 켜기/끄기 (켠 상태는 저장). 실제 재생은 첫 클릭·터치에서 시작된다.
+soundBtn.setAttribute('aria-pressed', String(sound.enabled));
+soundBtn.addEventListener('click', () => {
+  sound.setEnabled(!sound.enabled);
+  soundBtn.setAttribute('aria-pressed', String(sound.enabled));
+});
 
 // 차종 선택: 시작 화면과 주행 중 왼쪽 아래 패널이 같은 선택을 공유한다.
 const garage = document.getElementById('garage')!;
@@ -183,6 +189,7 @@ function frame(): void {
   syncTheme();
   car.setNight(sky.night);
   rig.update(dt, car, elapsed);
+  sound.update(car.speed, input.state.throttle, sky.night);
 
   hudSpeed.textContent = Math.round(car.speed * 3.6).toString();
   hudDistance.textContent = (car.distance / 1000).toFixed(1);
@@ -195,7 +202,7 @@ function frame(): void {
 }
 
 // 테스트·스크린샷용 훅
-(window as unknown as { cruiz: unknown }).cruiz = { car, sky, rig, start, quality, renderer, input, world };
+(window as unknown as { cruiz: unknown }).cruiz = { car, sky, rig, start, quality, renderer, input, world, sound };
 
 // 자연 에셋(약 300KB)을 먼저 받고 시작한다. 실패해도 기본 모양으로 이어진다.
 loadScenery().finally(() => requestAnimationFrame(frame));

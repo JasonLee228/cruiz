@@ -36,7 +36,7 @@
           <li><kbd>C</kbd> 카메라</li>
           <li><kbd>V</kbd> 차 바꾸기</li>
         </ul>
-        <p class="touch-hint">화면 왼쪽/오른쪽을 눌러 핸들을 돌리고, 오른쪽 아래 ▲▼로 속도를 바꿔요</p>
+        <p class="touch-hint">화면 왼쪽/오른쪽을 눌러 핸들을 돌리고, 오른쪽 아래 페달로 속도를 바꿔요</p>
         <label class="toggle"><input type="checkbox" id="opt-fps" /> FPS 표시</label>
       </div>
       <div id="fps" hidden></div>
@@ -53,12 +53,8 @@
     </div>
 
     <div id="pedals" class="touch-only" hidden>
-      <button type="button" id="pedal-up" class="pedal" aria-label="가속">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 6.5l7 9.5H5z"/></svg>
-      </button>
-      <button type="button" id="pedal-down" class="pedal" aria-label="감속">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 17.5L5 8h14z"/></svg>
-      </button>
+      <button type="button" id="pedal-down" class="pedal pedal-brake" aria-label="브레이크"><i></i><i></i><i></i><i></i></button>
+      <button type="button" id="pedal-up" class="pedal pedal-gas" aria-label="가속"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></button>
     </div>
 
     <svg width="0" height="0" style="position: absolute" aria-hidden="true">

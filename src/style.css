@@ -101,17 +101,12 @@ kbd {
 
 #car-picker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
 .car-option {
-  display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 2px solid transparent;
+  display: flex; align-items: center; padding: 8px 16px; border: 2px solid transparent;
   border-radius: 999px; font-size: 15px; font-weight: 700;
   background: var(--glass); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-.car-option i { width: 14px; height: 14px; border-radius: 4px; background: var(--c); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5); }
 .car-option[aria-checked='true'] { border-color: var(--accent); background: rgba(30, 30, 70, 0.4); }
 
-/* 낮 시작 화면은 레퍼런스 01처럼 가운데 정렬 */
-body[data-phase='day'] #start { align-items: flex-start; justify-content: center; padding-top: 14vh; background: linear-gradient(180deg, rgba(40, 80, 140, 0.18), rgba(40, 80, 140, 0) 50%); }
-body[data-phase='day'] .hero { text-align: center; max-width: 720px; }
-body[data-phase='day'] #car-picker { justify-content: center; }
 .hero h1 { font-weight: 700; }
 
 .toggle { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 14px; cursor: pointer; }
@@ -123,3 +118,28 @@ body[data-phase='day'] #car-picker { justify-content: center; }
   pointer-events: none;
 }
 #fps[hidden] { display: none; }
+
+/* 주행 중 차종 변경 (왼쪽 아래) */
+#garage {
+  position: fixed; left: clamp(16px, 5vw, 64px); bottom: 22px; z-index: 2;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+}
+#garage[hidden], #garage-panel[hidden] { display: none; }
+#garage-button {
+  display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 18px 0 14px; border: 0; border-radius: 999px;
+  font-size: 15px; font-weight: 700;
+  background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  transition: background 0.2s ease;
+}
+#garage-button svg { width: 22px; height: 22px; }
+#garage-button:hover, #garage-button[aria-expanded='true'] { background: rgba(30, 30, 70, 0.4); }
+#garage-panel {
+  display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 22px;
+  background: rgba(30, 30, 60, 0.35); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+#garage-panel .car-option { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+#garage-panel .car-option:hover { background: var(--glass); }
+#garage-panel .car-option[aria-checked='true'] { background: rgba(30, 30, 70, 0.4); }
+@media (max-width: 560px) {
+  #garage { bottom: 78px; }
+}

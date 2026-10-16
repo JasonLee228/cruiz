@@ -31,6 +31,7 @@
           <li><kbd>↑</kbd><kbd>↓</kbd> 속도</li>
           <li><kbd>A</kbd> 자동 주행</li>
           <li><kbd>C</kbd> 카메라</li>
+          <li><kbd>V</kbd> 차 바꾸기</li>
         </ul>
         <p class="touch-hint">화면 왼쪽/오른쪽을 눌러 핸들을 돌려요</p>
         <label class="toggle"><input type="checkbox" id="opt-fps" /> FPS 표시</label>
@@ -44,12 +45,20 @@
       <div id="hud-mode" class="badge" hidden>AUTO</div>
     </div>
 
+    <div id="garage" hidden>
+      <div id="garage-panel" class="car-picker" role="radiogroup" aria-label="차종 선택" hidden></div>
+      <button type="button" id="garage-button" aria-expanded="false" aria-controls="garage-panel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 11l1.6-4.2A2 2 0 0 1 8.5 5.5h7a2 2 0 0 1 1.9 1.3L19 11a2 2 0 0 1 2 2v3.5a1 1 0 0 1-1 1h-1a2 2 0 0 1-4 0H9a2 2 0 0 1-4 0H4a1 1 0 0 1-1-1V13a2 2 0 0 1 2-2zm2.2 0h9.6l-1.2-3.3a.5.5 0 0 0-.5-.3H8.9a.5.5 0 0 0-.5.3L7.2 11zM7 15.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zm10 0a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"/></svg>
+        <span id="garage-name">Classic</span>
+      </button>
+    </div>
+
     <main id="start">
       <section class="hero">
         <h1 id="hero-title">Just Drive</h1>
         <p id="hero-sub">Beautiful roads, brighter days.</p>
         <button id="start-button" type="button">Start Driving <span aria-hidden="true">→</span></button>
-        <div id="car-picker" role="radiogroup" aria-label="차종 선택"></div>
+        <div id="car-picker" class="car-picker" role="radiogroup" aria-label="차종 선택"></div>
       </section>
     </main>
 

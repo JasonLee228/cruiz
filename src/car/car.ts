@@ -29,6 +29,8 @@ export class Car {
   /** 도로 방향에 대한 차의 방향 (rad, +는 왼쪽). 매뉴얼에서만 벌어지고, 다른 모드에서는 0으로 돌아온다. */
   heading = 0;
   private manual = false;
+  /** 차 길이 (m). 카메라가 차를 화면에 담을 거리를 정할 때 쓴다. */
+  length = 4.3;
 
   private wheels: THREE.Mesh[] = [];
   private wheelRadius = 0.38;
@@ -64,6 +66,7 @@ export class Car {
     this.tail = m.tail;
     this.maxSpeed = spec.maxSpeed;
     this.halfWidth = spec.width / 2;
+    this.length = spec.length;
     this.targetSpeed = Math.min(this.targetSpeed, this.maxSpeed);
     this.setNight(this.night);
     this.place();

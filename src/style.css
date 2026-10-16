@@ -160,11 +160,11 @@ kbd {
 .hud-btn { height: 44px; border: 0; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .icon-btn.hud-btn { width: 44px; }
 .icon-btn.hud-btn svg { width: 20px; height: 20px; }
-#btn-auto {
+#btn-auto, #btn-manual {
   place-items: center; padding: 0 16px; border-radius: 999px; font-size: 13px; font-weight: 800;
   background: var(--glass); transition: background 0.2s ease, color 0.2s ease;
 }
-#btn-auto[aria-pressed='true'] { background: var(--accent); color: var(--accent-text); }
+#btn-auto[aria-pressed='true'], #btn-manual[aria-pressed='true'] { background: var(--accent); color: var(--accent-text); }
 #pedals {
   position: fixed; right: clamp(16px, 5vw, 64px); bottom: 22px; z-index: 2;
   grid-auto-flow: column; align-items: end; gap: 12px;
@@ -189,7 +189,8 @@ kbd {
 @media (pointer: coarse) and (max-width: 560px) {
   #pedals { bottom: 78px; }
   #hud { gap: 6px; }
-  .stat { padding: 8px 12px; }
+  .stat { padding: 8px 10px; }
+  #btn-auto, #btn-manual { padding: 0 12px; }
   .stat span { font-size: 20px; }
 }
 /* 폰 가로: 높이가 낮아 페달 간격을 줄인다 */

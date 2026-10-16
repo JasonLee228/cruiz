@@ -33,10 +33,11 @@
           <li><kbd>←</kbd><kbd>→</kbd> 핸들</li>
           <li><kbd>↑</kbd><kbd>↓</kbd> 속도</li>
           <li><kbd>A</kbd> 자동 주행</li>
+          <li><kbd>M</kbd> 매뉴얼 (차선 유지 끄기)</li>
           <li><kbd>C</kbd> 카메라</li>
           <li><kbd>V</kbd> 차 바꾸기</li>
         </ul>
-        <p class="touch-hint">화면 왼쪽/오른쪽을 눌러 핸들을 돌리고, 오른쪽 아래 페달로 속도를 바꿔요</p>
+        <p class="touch-hint">화면 왼쪽/오른쪽을 눌러 핸들을 돌리고, 오른쪽 아래 페달로 속도를 바꿔요. MANUAL을 켜면 차선 유지가 꺼져 굽이마다 직접 핸들을 돌려야 해요</p>
         <label class="toggle"><input type="checkbox" id="opt-fps" /> FPS 표시</label>
       </div>
       <div id="fps" hidden></div>
@@ -47,6 +48,7 @@
       <div class="stat"><span id="hud-distance">0.0</span><small>km</small></div>
       <div id="hud-mode" class="badge" hidden>AUTO</div>
       <button type="button" id="btn-auto" class="hud-btn touch-only" aria-pressed="false">AUTO</button>
+      <button type="button" id="btn-manual" class="hud-btn touch-only" aria-pressed="false">MANUAL</button>
       <button type="button" id="btn-camera" class="icon-btn hud-btn touch-only" aria-label="카메라 바꾸기">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 4.5h6l1.4 2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2h2.6L9 4.5zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0-2a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg>
       </button>

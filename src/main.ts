@@ -118,20 +118,27 @@ window.addEventListener('keydown', (e) => {
 });
 
 input.onToggleCamera = () => rig.next();
-input.onToggleAutopilot = (on) => {
-  hudMode.hidden = !on;
-  autoBtn.setAttribute('aria-pressed', String(on));
-};
+const manualBtn = document.getElementById('btn-manual')!;
+function syncMode(): void {
+  const mode = input.state.mode;
+  hudMode.hidden = mode === 'assist';
+  hudMode.textContent = mode === 'auto' ? 'AUTO' : 'MANUAL';
+  hudMode.classList.toggle('manual', mode === 'manual');
+  autoBtn.setAttribute('aria-pressed', String(mode === 'auto'));
+  manualBtn.setAttribute('aria-pressed', String(input.manual));
+}
+input.onModeChange = syncMode;
 
 // 터치 기기용 버튼 (페달, 자동 주행, 카메라). CSS가 터치 기기에서만 보여준다.
 input.bindPedal(document.getElementById('pedal-up')!, 1);
 input.bindPedal(document.getElementById('pedal-down')!, -1);
 autoBtn.addEventListener('click', () => input.toggleAutopilot());
+manualBtn.addEventListener('click', () => input.toggleManual());
 document.getElementById('btn-camera')!.addEventListener('click', () => rig.next());
 
 // 출발 전에는 자동 주행으로 천천히 달리며 배경처럼 보여준다.
 let started = false;
-input.state.autopilot = true;
+input.state.mode = 'auto';
 car.targetSpeed = 12;
 
 function start(): void {
@@ -141,7 +148,9 @@ function start(): void {
   hud.hidden = false;
   garage.hidden = false;
   pedals.hidden = false;
-  input.state.autopilot = false;
+  input.active = true;
+  input.setMode(input.freeMode);
+  syncMode();
   car.targetSpeed = 22;
 }
 startButton.addEventListener('click', start);
@@ -186,7 +195,7 @@ function frame(): void {
 }
 
 // 테스트·스크린샷용 훅
-(window as unknown as { cruiz: unknown }).cruiz = { car, sky, rig, start, quality, renderer };
+(window as unknown as { cruiz: unknown }).cruiz = { car, sky, rig, start, quality, renderer, input, world };
 
 // 자연 에셋(약 300KB)을 먼저 받고 시작한다. 실패해도 기본 모양으로 이어진다.
 loadScenery().finally(() => requestAnimationFrame(frame));

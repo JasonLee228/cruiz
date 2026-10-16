@@ -5,6 +5,8 @@ import type { Car } from './car';
 type Mode = 'chase' | 'cockpit' | 'cinematic';
 const MODES: Mode[] = ['chase', 'cockpit', 'cinematic'];
 
+const BASE_FOV = 62;
+
 /** 시네마틱 카메라가 가드레일 안쪽으로 남겨 두는 여유 (m) */
 const RAIL_MARGIN = 0.8;
 /** 도로의 가장 급한 굽이보다 조금 큰 곡률 (1/m). 차 앞뒤로 떨어진 만큼 도로가 휘는 폭을 여유에 더한다. */
@@ -36,7 +38,7 @@ export class CameraRig {
   private target = new THREE.Vector3();
 
   constructor() {
-    this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 1500);
+    this.camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth / window.innerHeight, 0.1, 1500);
   }
 
   next(): void {
@@ -58,8 +60,8 @@ export class CameraRig {
       }
       this.yawTarget = this.mode === 'cinematic' ? car.yaw - car.heading : car.yaw;
       if (this.mode === 'chase') {
-        const speedFactor = Math.min(car.speed / 33, 1);
-        this.desired.set(0, 3.0, -(7.5 + speedFactor * 1.5));
+        // 속도감: 빠를수록 뒤로 물러나고(158km/h에서 약 18m) 시야각이 넓어진다.
+        this.desired.set(0, 3.0, -(7.5 + car.speed * 0.24));
         this.desiredLook.set(0, 1.0, 8);
       } else {
         this.cinematic(dt, car, elapsed);
@@ -79,6 +81,12 @@ export class CameraRig {
     }
     this.first = false;
 
+    const fov = this.mode === 'chase' ? BASE_FOV + Math.min(car.speed / 44, 1) * 8 : BASE_FOV;
+    if (Math.abs(fov - this.camera.fov) > 0.01) {
+      this.camera.fov = THREE.MathUtils.damp(this.camera.fov, fov, 3, dt);
+      this.camera.updateProjectionMatrix();
+    }
+
     // 차 기준 좌표 → 월드. 차의 전방 = (-sin, 0, -cos), 오른쪽 = (cos, 0, -sin)
     const sin = Math.sin(this.camYaw);
     const cos = Math.cos(this.camYaw);
@@ -92,7 +100,7 @@ export class CameraRig {
   /** 차 옆을 천천히 오가는 시네마틱 뷰. 차가 화면에 다 들어오고, 가드레일·가로등 너머로 나가지 않게 한다. */
   private cinematic(dt: number, car: Car, elapsed: number): void {
     // 화면 비율에 맞춰 차가 다 들어오는 거리. 세로 화면은 가로 시야가 좁아 더 멀리 선다.
-    const halfV = THREE.MathUtils.degToRad(this.camera.fov / 2);
+    const halfV = THREE.MathUtils.degToRad(BASE_FOV / 2);
     const halfH = Math.atan(Math.tan(halfV) * this.camera.aspect);
     const radius = car.length * 0.62;
     const dist = Math.max(6.5, (radius / Math.sin(Math.min(halfV, halfH))) * 1.2);

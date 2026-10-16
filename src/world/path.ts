@@ -6,6 +6,8 @@ import { noise1, noise2 } from './random';
  */
 
 export const ROAD_HALF_WIDTH = 4.2;
+/** 가드레일이 서 있는 위치 (도로 중심에서 옆으로). 차는 이 안쪽에서만 움직인다. */
+export const RAIL_LATERAL = ROAD_HALF_WIDTH + 0.9;
 
 /** 도로 중심 x. 큰 굽이 + 작은 굽이를 겹쳐 자연스러운 곡선을 만든다. */
 export function roadX(z: number): number {

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { ROAD_HALF_WIDTH, roadDX, roadX, roadY, terrainY, waterY } from './path';
+import { RAIL_LATERAL, ROAD_HALF_WIDTH, roadDX, roadX, roadY, terrainY, waterY } from './path';
 import { mulberry32 } from './random';
 import { BARK, LEAF, scenery, type Variant } from './assets';
 import { cliffVariants } from './cliffs';
@@ -453,7 +453,7 @@ function buildBoats(group: THREE.Group, z0: number, rand: () => number): void {
 function buildRoadside(group: THREE.Group, z0: number, z1: number): void {
   const rails: THREE.BufferGeometry[] = [];
   for (const side of [-1, 1]) {
-    const edge = side * (ROAD_HALF_WIDTH + 0.9);
+    const edge = side * RAIL_LATERAL;
     rails.push(wall(z0, z1, edge, 0.5, 0.88));
   }
   const m = new THREE.Matrix4();
@@ -468,7 +468,7 @@ function buildRoadside(group: THREE.Group, z0: number, z1: number): void {
   postZs.forEach((z, i) => {
     q.setFromAxisAngle(up, Math.atan(-roadDX(z)));
     [-1, 1].forEach((side, k) => {
-      roadPoint(z, side * (ROAD_HALF_WIDTH + 0.9), 0, p);
+      roadPoint(z, side * RAIL_LATERAL, 0, p);
       m.compose(p, q, one);
       posts.setMatrixAt(i * 2 + k, m);
     });

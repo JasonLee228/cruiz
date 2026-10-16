@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ROAD_HALF_WIDTH, roadDX, roadDY, roadX, roadY } from '../world/path';
+import { RAIL_LATERAL, ROAD_HALF_WIDTH, roadDX, roadDY, roadX, roadY } from '../world/path';
 import type { InputState } from '../input';
 import { buildCar, getSpec, type CarModel, type CarSpec } from './models';
 
@@ -22,6 +22,8 @@ export class Car {
   private wheels: THREE.Mesh[] = [];
   private wheelRadius = 0.38;
   private maxSpeed = 33;
+  /** 차체 절반 폭. 가드레일에 닿는 위치를 정한다. */
+  private halfWidth = 0.95;
   private night = 0;
   headlight!: THREE.SpotLight;
   private tail!: THREE.MeshBasicMaterial;
@@ -50,6 +52,7 @@ export class Car {
     this.headlight = m.headlight;
     this.tail = m.tail;
     this.maxSpeed = spec.maxSpeed;
+    this.halfWidth = spec.width / 2;
     this.targetSpeed = Math.min(this.targetSpeed, this.maxSpeed);
     this.setNight(this.night);
     this.place();
@@ -82,10 +85,15 @@ export class Car {
     const limit = offRoad ? Math.min(this.targetSpeed, 14) : this.targetSpeed;
     this.speed = THREE.MathUtils.damp(this.speed, limit, 1.2, dt);
 
-    // 조향은 속도에 비례해 옆으로 이동. 너무 멀리 나가면 부드럽게 끌어당긴다.
+    // 조향은 속도에 비례해 옆으로 이동한다.
     this.lateral += this.steer * STEER_RATE * Math.min(this.speed, 20) * dt * 0.35;
-    const edge = ROAD_HALF_WIDTH + 2;
-    if (Math.abs(this.lateral) > edge) this.lateral = THREE.MathUtils.damp(this.lateral, Math.sign(this.lateral) * edge, 6, dt);
+    // 가드레일: 차체 옆면이 레일에 닿으면 더 나가지 못하고, 레일을 긁는 동안 속도가 줄어든다.
+    // 차가 조향으로 살짝 틀어지는 만큼(앞 모서리)과 여유를 빼 차체가 레일을 뚫고 보이지 않게 한다.
+    const edge = RAIL_LATERAL - this.halfWidth - 0.35;
+    if (Math.abs(this.lateral) > edge) {
+      this.lateral = Math.sign(this.lateral) * edge;
+      this.speed = THREE.MathUtils.damp(this.speed, Math.min(this.speed, 10), 1.5, dt);
+    }
 
     this.distance += this.speed * dt;
     this.place();

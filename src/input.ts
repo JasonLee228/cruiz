@@ -3,26 +3,41 @@ export interface InputState {
   steer: number;
   /** -1 감속, 0 유지, 1 가속 */
   throttle: number;
-  autopilot: boolean;
+  mode: DriveMode;
 }
+
+/**
+ * auto: 오른쪽 차선 중앙을 스스로 유지한다.
+ * assist: 차가 도로 굽이를 따라가고, 핸들로 차선만 옮긴다.
+ * manual: 도로를 따라가는 보조가 없다. 굽이마다 직접 핸들을 돌려야 하고, 가드레일만이 경계다.
+ */
+export type DriveMode = 'auto' | 'assist' | 'manual';
+
+const MANUAL_KEY = 'cruiz.manual';
 
 /** 키보드와 터치를 하나의 상태로 모은다. */
 export class Input {
-  readonly state: InputState = { steer: 0, throttle: 0, autopilot: false };
+  readonly state: InputState = { steer: 0, throttle: 0, mode: 'assist' };
+  /** 자동 주행을 끄면 돌아갈 모드 (어시스트 또는 매뉴얼). 매뉴얼 선택은 저장한다. */
+  manual = false;
+  /** 출발 전(시작 화면)에는 모드 키를 받지 않는다. */
+  active = false;
   onToggleCamera: () => void = () => {};
-  onToggleAutopilot: (on: boolean) => void = () => {};
+  onModeChange: (mode: DriveMode) => void = () => {};
 
   private keys = new Set<string>();
   private touches = new Map<number, number>(); // pointerId → -1 | 1
   private pedals = new Map<number, number>(); // pointerId → -1 감속 | 1 가속
 
   constructor(target: HTMLElement) {
+    try { this.manual = localStorage.getItem(MANUAL_KEY) === '1'; } catch { /* 무시 */ }
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       const key = e.key.toLowerCase();
       this.keys.add(key);
       if (key === 'c') this.onToggleCamera();
-      if (key === 'a') this.toggleAutopilot();
+      if (this.active && key === 'a') this.toggleAutopilot();
+      if (this.active && key === 'm') this.toggleManual();
       if (key.startsWith('arrow')) e.preventDefault();
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
@@ -55,9 +70,25 @@ export class Input {
     button.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
+  get freeMode(): DriveMode {
+    return this.manual ? 'manual' : 'assist';
+  }
+
+  setMode(mode: DriveMode): void {
+    if (this.state.mode === mode) return;
+    this.state.mode = mode;
+    this.onModeChange(mode);
+  }
+
   toggleAutopilot(): void {
-    this.state.autopilot = !this.state.autopilot;
-    this.onToggleAutopilot(this.state.autopilot);
+    this.setMode(this.state.mode === 'auto' ? this.freeMode : 'auto');
+  }
+
+  /** 매뉴얼 ↔ 어시스트. 자동 주행 중이면 자동 주행도 끄고 바로 그 모드로 넘어간다. */
+  toggleManual(): void {
+    this.manual = !this.manual;
+    try { localStorage.setItem(MANUAL_KEY, this.manual ? '1' : '0'); } catch { /* 무시 */ }
+    this.setMode(this.freeMode);
   }
 
   update(): void {
@@ -74,9 +105,6 @@ export class Input {
     this.state.throttle = Math.max(-1, Math.min(1, throttle));
 
     // 직접 핸들을 잡으면 자동 주행을 끈다
-    if (this.state.autopilot && steer !== 0) {
-      this.state.autopilot = false;
-      this.onToggleAutopilot(false);
-    }
+    if (this.state.mode === 'auto' && steer !== 0) this.setMode(this.freeMode);
   }
 }

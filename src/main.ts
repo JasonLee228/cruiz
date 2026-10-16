@@ -61,6 +61,9 @@ const heroSub = document.getElementById('hero-sub')!;
 const settingsBtn = document.getElementById('btn-settings')!;
 const settingsPanel = document.getElementById('settings-panel')!;
 const soundBtn = document.getElementById('btn-sound')!;
+const phaseIcon = document.querySelector('#btn-phase use')!;
+const autoBtn = document.getElementById('btn-auto')!;
+const pedals = document.getElementById('pedals')!;
 
 const COPY = {
   day: ['Just Drive', 'Beautiful roads, brighter days.'],
@@ -75,10 +78,14 @@ function syncTheme(): void {
   document.body.dataset.phase = phase;
   [heroTitle.textContent, heroSub.textContent] = COPY[phase];
   document.querySelectorAll<HTMLElement>('[data-theme-set]').forEach((b) => b.classList.toggle('active', b.dataset.themeSet === phase));
+  phaseIcon.setAttribute('href', `#icon-${phase}`);
 }
 document.querySelectorAll<HTMLElement>('[data-theme-set]').forEach((b) =>
   b.addEventListener('click', () => sky.setPhase(b.dataset.themeSet as 'day' | 'sunset' | 'night')),
 );
+// 좁은 화면에서는 시간대 글자 버튼 대신 아이콘 하나로 낮 → 노을 → 밤을 돌린다.
+const NEXT_PHASE = { day: 'sunset', sunset: 'night', night: 'day' } as const;
+document.getElementById('btn-phase')!.addEventListener('click', () => sky.setPhase(NEXT_PHASE[sky.phase]));
 settingsBtn.addEventListener('click', () => {
   settingsPanel.hidden = !settingsPanel.hidden;
   settingsBtn.setAttribute('aria-expanded', String(!settingsPanel.hidden));
@@ -111,7 +118,16 @@ window.addEventListener('keydown', (e) => {
 });
 
 input.onToggleCamera = () => rig.next();
-input.onToggleAutopilot = (on) => (hudMode.hidden = !on);
+input.onToggleAutopilot = (on) => {
+  hudMode.hidden = !on;
+  autoBtn.setAttribute('aria-pressed', String(on));
+};
+
+// 터치 기기용 버튼 (페달, 자동 주행, 카메라). CSS가 터치 기기에서만 보여준다.
+input.bindPedal(document.getElementById('pedal-up')!, 1);
+input.bindPedal(document.getElementById('pedal-down')!, -1);
+autoBtn.addEventListener('click', () => input.toggleAutopilot());
+document.getElementById('btn-camera')!.addEventListener('click', () => rig.next());
 
 // 출발 전에는 자동 주행으로 천천히 달리며 배경처럼 보여준다.
 let started = false;
@@ -124,6 +140,7 @@ function start(): void {
   startScreen.classList.add('hidden');
   hud.hidden = false;
   garage.hidden = false;
+  pedals.hidden = false;
   input.state.autopilot = false;
   car.targetSpeed = 22;
 }

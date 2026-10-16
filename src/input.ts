@@ -14,6 +14,7 @@ export class Input {
 
   private keys = new Set<string>();
   private touches = new Map<number, number>(); // pointerId → -1 | 1
+  private pedals = new Map<number, number>(); // pointerId → -1 감속 | 1 가속
 
   constructor(target: HTMLElement) {
     window.addEventListener('keydown', (e) => {
@@ -36,6 +37,24 @@ export class Input {
     target.addEventListener('pointercancel', release);
   }
 
+  /** 터치 페달 버튼: 누르고 있는 동안만 가속/감속한다. 화면 터치(핸들)와 따로 센다. */
+  bindPedal(button: HTMLElement, dir: 1 | -1): void {
+    button.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try { button.setPointerCapture(e.pointerId); } catch { /* 합성 이벤트 등 */ }
+      this.pedals.set(e.pointerId, dir);
+      button.classList.add('pressed');
+    });
+    const release = (e: PointerEvent) => {
+      this.pedals.delete(e.pointerId);
+      if (![...this.pedals.values()].includes(dir)) button.classList.remove('pressed');
+    };
+    button.addEventListener('pointerup', release);
+    button.addEventListener('pointercancel', release);
+    button.addEventListener('lostpointercapture', release);
+    button.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
   toggleAutopilot(): void {
     this.state.autopilot = !this.state.autopilot;
     this.onToggleAutopilot(this.state.autopilot);
@@ -51,7 +70,8 @@ export class Input {
     let throttle = 0;
     if (this.keys.has('arrowup') || this.keys.has('w')) throttle += 1;
     if (this.keys.has('arrowdown') || this.keys.has('s')) throttle -= 1;
-    this.state.throttle = throttle;
+    for (const dir of this.pedals.values()) throttle += dir;
+    this.state.throttle = Math.max(-1, Math.min(1, throttle));
 
     // 직접 핸들을 잡으면 자동 주행을 끈다
     if (this.state.autopilot && steer !== 0) {

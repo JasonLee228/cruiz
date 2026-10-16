@@ -18,6 +18,9 @@
         <button type="button" class="nav-link" data-theme-set="day">Day</button>
         <button type="button" class="nav-link" data-theme-set="sunset">Sunset</button>
         <button type="button" class="nav-link" data-theme-set="night">Night</button>
+        <button type="button" id="btn-phase" class="icon-btn" aria-label="시간대 바꾸기">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-day" /></svg>
+        </button>
         <button type="button" id="btn-sound" class="icon-btn" aria-label="소리" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
@@ -33,7 +36,7 @@
           <li><kbd>C</kbd> 카메라</li>
           <li><kbd>V</kbd> 차 바꾸기</li>
         </ul>
-        <p class="touch-hint">화면 왼쪽/오른쪽을 눌러 핸들을 돌려요</p>
+        <p class="touch-hint">화면 왼쪽/오른쪽을 눌러 핸들을 돌리고, 오른쪽 아래 페달로 속도를 바꿔요</p>
         <label class="toggle"><input type="checkbox" id="opt-fps" /> FPS 표시</label>
       </div>
       <div id="fps" hidden></div>
@@ -43,7 +46,22 @@
       <div class="stat"><span id="hud-speed">0</span><small>km/h</small></div>
       <div class="stat"><span id="hud-distance">0.0</span><small>km</small></div>
       <div id="hud-mode" class="badge" hidden>AUTO</div>
+      <button type="button" id="btn-auto" class="hud-btn touch-only" aria-pressed="false">AUTO</button>
+      <button type="button" id="btn-camera" class="icon-btn hud-btn touch-only" aria-label="카메라 바꾸기">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 4.5h6l1.4 2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2h2.6L9 4.5zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0-2a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg>
+      </button>
     </div>
+
+    <div id="pedals" class="touch-only" hidden>
+      <button type="button" id="pedal-down" class="pedal pedal-brake" aria-label="브레이크"><i></i><i></i><i></i><i></i></button>
+      <button type="button" id="pedal-up" class="pedal pedal-gas" aria-label="가속"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></button>
+    </div>
+
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="icon-day" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="icon-sunset" viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 16a5.5 5.5 0 0 1 11 0z"/><path d="M3 19.5h18M12 5v2.5M5.2 8.7l1.6 1.6M18.8 8.7l-1.6 1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="icon-night" viewBox="0 0 24 24"><path fill="currentColor" d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></symbol>
+    </svg>
 
     <div id="garage" hidden>
       <div id="garage-panel" class="car-picker" role="radiogroup" aria-label="차종 선택" hidden></div>

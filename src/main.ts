@@ -106,9 +106,11 @@ const garagePanel = document.getElementById('garage-panel')!;
 const garageName = document.getElementById('garage-name')!;
 const picker = mountCarPicker([document.getElementById('car-picker')!, garagePanel], (spec) => {
   car.setType(spec);
+  sound.setCar(spec);
   garageName.textContent = spec.name;
 });
 garageName.textContent = picker.current().name;
+sound.setCar(picker.current());
 function setGarageOpen(open: boolean): void {
   garagePanel.hidden = !open;
   garageButton.setAttribute('aria-expanded', String(open));

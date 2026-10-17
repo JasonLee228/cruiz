@@ -111,7 +111,7 @@ export class CameraRig {
     // 세로 화면은 가로 시야가 좁아 핸들만 보이므로 세로 시야각을 넓힌다.
     const portrait = THREE.MathUtils.clamp((1.2 - this.camera.aspect) / 0.7, 0, 1);
     const speedT = Math.min(car.speed / 44, 1);
-    this.setFov(COCKPIT_FOV + speedT * COCKPIT_FOV_GAIN + portrait * 12, dt);
+    this.setFov(COCKPIT_FOV + speedT * COCKPIT_FOV_GAIN + portrait * 4, dt);
     this.glance = this.first ? 0 : THREE.MathUtils.damp(this.glance, car.wheelTurn * 0.12, 3, dt);
     this.first = false;
 
@@ -119,9 +119,11 @@ export class CameraRig {
     o.updateMatrixWorld();
     const e = car.cockpit.eye;
     const shake = speedT * speedT * 0.004;
-    this.camera.position.set(e.x, e.y + Math.sin(elapsed * 37) * shake + Math.sin(elapsed * 23) * shake * 0.6, e.z);
+    // 세로 화면은 가로 시야가 좁으므로 눈을 뒤로 물려 앞유리와 실내가 더 많이 들어오게 한다.
+    const back = portrait * Math.min(0.45, car.cockpit.maxBack);
+    this.camera.position.set(e.x, e.y + Math.sin(elapsed * 37) * shake + Math.sin(elapsed * 23) * shake * 0.6, e.z + back);
     // 차의 앞은 -z. 고개를 아주 조금 숙여 대시보드 너머 도로가 화면 가운데 오게 한다.
-    this.target.set(e.x + Math.sin(this.glance) * 10, e.y - 1.3 - portrait * 0.3, e.z - Math.cos(this.glance) * 10);
+    this.target.set(e.x + Math.sin(this.glance) * 10, e.y - 1.3, e.z + back - Math.cos(this.glance) * 10);
     o.localToWorld(this.camera.position);
     o.localToWorld(this.target);
     this.camera.lookAt(this.target);

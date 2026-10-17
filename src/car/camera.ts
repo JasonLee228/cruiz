@@ -121,7 +121,7 @@ export class CameraRig {
     const shake = speedT * speedT * 0.004;
     this.camera.position.set(e.x, e.y + Math.sin(elapsed * 37) * shake + Math.sin(elapsed * 23) * shake * 0.6, e.z);
     // 차의 앞은 -z. 고개를 아주 조금 숙여 대시보드 너머 도로가 화면 가운데 오게 한다.
-    this.target.set(e.x + Math.sin(this.glance) * 10, e.y - 0.6 - portrait * 0.3, e.z - Math.cos(this.glance) * 10);
+    this.target.set(e.x + Math.sin(this.glance) * 10, e.y - 1.3 - portrait * 0.3, e.z - Math.cos(this.glance) * 10);
     o.localToWorld(this.camera.position);
     o.localToWorld(this.target);
     this.camera.lookAt(this.target);

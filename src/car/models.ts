@@ -468,7 +468,7 @@ function buildCockpit(spec: CarSpec, topAt: (z: number) => number, hwAt: (z: num
   // 핸들과 대시보드는 눈높이 기준으로 둔다. 밴처럼 높이 앉는 차는 대시보드도 높다.
   const wheelZ = seatZ - 0.52;
   // 허리선보다 낮으면 차체에 묻히므로 그 위로 올린다 (스포츠카처럼 낮게 앉는 차)
-  const wheelY = Math.max(eye.y - 0.33, topAt(seatZ) + 0.06);
+  const wheelY = Math.max(eye.y - 0.3, topAt(seatZ) + 0.06);
   const dashRear = seatZ - 0.68;
   const dashTop = Math.max(topAt(cb.front) + 0.04, eye.y - 0.4);
   const floor = spec.bottom + 0.12;
@@ -501,7 +501,7 @@ function buildCockpit(spec: CarSpec, topAt: (z: number) => number, hwAt: (z: num
   for (const sx of [-1, 1]) {
     const a = new THREE.Vector3(sx * innerLow(cb.front), topAt(cb.front), cb.front);
     const c = new THREE.Vector3(sx * innerTop(rf), roofY - 0.03, rf);
-    beam(b, a, c, 0.045, paint);
+    beam(b, a, c, 0.034, paint);
   }
 
   // 천장, 앞유리 위 테두리, 룸미러
@@ -520,9 +520,10 @@ function buildCockpit(spec: CarSpec, topAt: (z: number) => number, hwAt: (z: num
   const zc = (cb.front + doorEnd) / 2;
   for (const sx of [-1, 1]) {
     const x = sx * (innerLow(zc) - 0.03);
-    const top = topAt(zc) + 0.02;
-    b.add(new THREE.BoxGeometry(0.06, top - floor, doorEnd - cb.front).translate(x, (top + floor) / 2, zc), TRIM);
-    b.add(new THREE.BoxGeometry(0.09, 0.04, doorEnd - cb.front).translate(x, top, zc), paint);
+    // 문 위 테두리는 허리선보다 조금 낮춰 옆 아래 시야를 넓힌다 (눈 가까이에 있어 화면을 크게 가린다)
+    const top = topAt(zc) - 0.05;
+    b.add(new THREE.BoxGeometry(0.04, top - floor, doorEnd - cb.front).translate(x + sx * 0.01, (top + floor) / 2, zc), TRIM);
+    b.add(new THREE.BoxGeometry(0.05, 0.025, doorEnd - cb.front).translate(x + sx * 0.01, top, zc), paint);
     b.add(new THREE.BoxGeometry(0.08, 0.04, 0.45).translate(x - sx * 0.05, top - 0.17, seatZ + 0.1), DASH);
   }
 
@@ -545,12 +546,15 @@ function buildCockpit(spec: CarSpec, topAt: (z: number) => number, hwAt: (z: num
 
   // 핸들: 자기 축(z)으로 돌도록 기울인 받침 안에 넣는다
   const s = new Builder(true);
+  // 깊이 검사 없이 맨 마지막에 그리므로 뒤에 올 부품을 나중에 넣는다 (테 → 살 → 허브 → 엠블럼)
   s.add(new THREE.TorusGeometry(0.16, 0.021, 6, 24), DARK);
-  s.add(new THREE.CylinderGeometry(0.05, 0.055, 0.05, 10).rotateX(Math.PI / 2), '#4a4658');
-  s.add(new THREE.CylinderGeometry(0.025, 0.025, 0.06, 10).rotateX(Math.PI / 2), paint);
   for (const sx of [-1, 1]) s.add(new THREE.BoxGeometry(0.12, 0.03, 0.02).translate(sx * 0.1, -0.01, 0), DARK);
   s.add(new THREE.BoxGeometry(0.03, 0.11, 0.02).translate(0, -0.1, 0), DARK);
-  const steering = new THREE.Mesh(s.build(), new THREE.MeshLambertMaterial({ vertexColors: true }));
+  s.add(new THREE.CylinderGeometry(0.05, 0.055, 0.05, 10).rotateX(Math.PI / 2), '#4a4658');
+  s.add(new THREE.CylinderGeometry(0.025, 0.025, 0.06, 10).rotateX(Math.PI / 2), paint);
+  // 핸들 아래쪽은 허리선(다리 덮개)보다 낮아 가려진다. 핸들은 눈에 가장 가까운 물체라 늘 위에 그린다.
+  const steering = new THREE.Mesh(s.build(), new THREE.MeshLambertMaterial({ vertexColors: true, depthTest: false }));
+  steering.renderOrder = 10;
   const mount = new THREE.Group();
   mount.position.copy(hub);
   mount.rotation.x = tilt;

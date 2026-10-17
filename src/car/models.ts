@@ -23,6 +23,8 @@ export interface CarSpec {
   wheel: { r: number; width: number; zFront: number; zRear: number };
   /** 최고 속도(m/s) */
   maxSpeed: number;
+  /** 운전석 눈 위치 z. 운전석 뷰의 카메라와 핸들·대시보드 위치가 여기서 정해진다. */
+  seatZ: number;
 }
 
 export const CARS: CarSpec[] = [
@@ -34,7 +36,7 @@ export const CARS: CarSpec[] = [
     top: [[-2.15, 0.78], [-1.9, 0.9], [-0.8, 0.97], [1.25, 0.99], [2.15, 0.93]],
     cabin: { front: -0.8, roofFront: -0.22, roofRear: 0.72, rear: 1.28, height: 0.56, top: 0.9, pillars: [0.24] },
     wheel: { r: 0.36, width: 0.26, zFront: -1.35, zRear: 1.32 },
-    maxSpeed: 33,
+    maxSpeed: 33, seatZ: 0.12,
   },
   {
     id: 'hatch', name: 'Hatchback', style: 'hatch',
@@ -43,7 +45,7 @@ export const CARS: CarSpec[] = [
     top: [[-1.98, 0.74], [-1.75, 0.87], [-0.7, 0.95], [1.98, 0.98]],
     cabin: { front: -0.7, roofFront: -0.12, roofRear: 1.5, rear: 1.92, height: 0.6, top: 0.9, pillars: [0.55] },
     wheel: { r: 0.35, width: 0.26, zFront: -1.25, zRear: 1.25 },
-    maxSpeed: 33,
+    maxSpeed: 33, seatZ: 0.22,
   },
   {
     id: 'sports', name: 'Sports', style: 'sports',
@@ -52,7 +54,7 @@ export const CARS: CarSpec[] = [
     top: [[-2.25, 0.54], [-1.95, 0.74], [-1.4, 0.8], [-0.55, 0.8], [1.3, 0.84], [2.25, 0.86]],
     cabin: { front: -0.55, roofFront: 0.08, roofRear: 0.55, rear: 1.8, height: 0.42, top: 0.84, pillars: [] },
     wheel: { r: 0.34, width: 0.32, zFront: -1.45, zRear: 1.4 },
-    maxSpeed: 44,
+    maxSpeed: 44, seatZ: 0.5,
   },
   {
     id: 'suv', name: 'SUV', style: 'suv',
@@ -61,7 +63,7 @@ export const CARS: CarSpec[] = [
     top: [[-2.2, 1.05], [-1.95, 1.18], [-0.9, 1.25], [2.2, 1.28]],
     cabin: { front: -0.9, roofFront: -0.42, roofRear: 2.0, rear: 2.14, height: 0.72, top: 0.95, pillars: [0.36, 1.42] },
     wheel: { r: 0.46, width: 0.36, zFront: -1.4, zRear: 1.4 },
-    maxSpeed: 28,
+    maxSpeed: 28, seatZ: -0.05,
   },
   {
     id: 'van', name: 'Retro Van', style: 'van',
@@ -70,7 +72,7 @@ export const CARS: CarSpec[] = [
     top: [[-2.15, 1.04], [-1.95, 1.12], [2.15, 1.12]],
     cabin: { front: -2.1, roofFront: -1.88, roofRear: 1.96, rear: 2.12, height: 0.85, top: 0.95, pillars: [-1.15, -0.25, 0.65] },
     wheel: { r: 0.4, width: 0.3, zFront: -1.35, zRear: 1.4 },
-    maxSpeed: 26,
+    maxSpeed: 26, seatZ: -1.35,
   },
 ];
 
@@ -84,10 +86,29 @@ export interface CarModel {
   headlight: THREE.SpotLight;
   tail: THREE.MeshBasicMaterial;
   wheelRadius: number;
+  cockpit: Cockpit;
+}
+
+/** 운전석 뷰에서만 보이는 실내. 차체 껍데기는 안쪽에서 보면 면이 뒤집혀 그려지지 않으므로 따로 만든다. */
+export interface Cockpit {
+  /** 대시보드·기둥·천장·문 + 계기판 + 핸들. 평소에는 숨겨 둔다. */
+  group: THREE.Group;
+  /** 핸들 (자기 축으로 돌린다) */
+  steering: THREE.Object3D;
+  /** 운전석 눈 위치 (차 기준 좌표) */
+  eye: THREE.Vector3;
+  /** 계기판·화면. 밤에는 은은하게 빛난다. */
+  dial: THREE.MeshBasicMaterial;
+  /** 실내 재질. 밤낮 밝기를 색으로 맞춘다. */
+  interior: THREE.MeshBasicMaterial;
+  /** 운전석에서는 안 보여 숨겨도 되는 것 (바퀴, 후미등) */
+  hidden: THREE.Object3D[];
 }
 
 const CHROME = '#e4e6ee';
 const DARK = '#3b3748';
+const DASH = '#5d5670';
+const TRIM = '#f1ebe0';
 
 /**
  * 삼각형을 모아 하나의 지오메트리로 만든다. 색은 버텍스 컬러로 넣어
@@ -383,7 +404,8 @@ export function buildCar(spec: CarSpec): CarModel {
   const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#fff4c2').multiplyScalar(2.5) });
   root.add(new THREE.Mesh(head.build(), lampMat));
   const tail = new THREE.MeshBasicMaterial({ color: '#8a2a2a' });
-  root.add(new THREE.Mesh(tailB.build(), tail));
+  const tailMesh = new THREE.Mesh(tailB.build(), tail);
+  root.add(tailMesh);
 
   // ── 바퀴: 도넛 모양 타이어 + 휠캡 + 허브 + 볼트를 한 지오메트리로. 볼트가 있어 굴러가는 게 보인다.
   // 매끈한 음영 + 48분할이면 화면에서는 완전한 원으로 보인다.
@@ -415,5 +437,137 @@ export function buildCar(spec: CarSpec): CarModel {
   headlight.target.position.set(0, 0, -20);
   root.add(headlight, headlight.target);
 
-  return { root, wheels, headlight, tail, wheelRadius: w.r };
+  const cockpit = buildCockpit(spec, topAt, hwAt);
+  cockpit.hidden.push(tailMesh, ...wheels);
+  root.add(cockpit.group);
+
+  return { root, wheels, headlight, tail, wheelRadius: w.r, cockpit };
+}
+
+/** a에서 c까지 이어지는 각진 기둥 */
+function beam(b: Builder, a: THREE.Vector3, c: THREE.Vector3, r: number, color: string): void {
+  const d = new THREE.Vector3().subVectors(c, a);
+  const g = new THREE.CylinderGeometry(r, r, d.length(), 6);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
+  g.translate((a.x + c.x) / 2, (a.y + c.y) / 2, (a.z + c.z) / 2);
+  b.add(g, color);
+}
+
+/**
+ * 운전석 실내: 대시보드, 계기판, 핸들, A필러, 천장, 문 안쪽.
+ * 실내 1 + 계기판 1 + 핸들 1 메시. 대신 운전석에서는 바퀴 4개와 후미등을 숨겨 draw call이 오히려 준다.
+ */
+function buildCockpit(spec: CarSpec, topAt: (z: number) => number, hwAt: (z: number) => number): Cockpit {
+  const { cabin: cb, seatZ } = spec;
+  const roofAt = (z: number): number => topAt(z) + cb.height;
+  // 캐빈 껍데기 안쪽 반폭: 허리선 높이와 지붕 높이 (단면 고리의 둥근 윗모서리만큼 더 좁다)
+  const innerLow = (z: number): number => hwAt(z) * 0.95 * 0.96;
+  const innerTop = (z: number): number => hwAt(z) * 0.95 * cb.top * 0.84;
+
+  const eye = new THREE.Vector3(-spec.width * 0.2, roofAt(seatZ) - Math.min(0.17, cb.height * 0.3), seatZ);
+  // 핸들과 대시보드는 눈높이 기준으로 둔다. 밴처럼 높이 앉는 차는 대시보드도 높다.
+  const wheelZ = seatZ - 0.52;
+  // 허리선보다 낮으면 차체에 묻히므로 그 위로 올린다 (스포츠카처럼 낮게 앉는 차)
+  const wheelY = Math.max(eye.y - 0.33, topAt(seatZ) + 0.06);
+  const dashRear = seatZ - 0.68;
+  const dashTop = Math.max(topAt(cb.front) + 0.04, eye.y - 0.4);
+  const floor = spec.bottom + 0.12;
+  const lap = topAt(seatZ) + 0.01;
+
+  const b = new Builder();
+  const paint = spec.upper ?? spec.color;
+
+  // 대시보드: 앞유리 밑에서 핸들 앞까지. 위는 어두운 패드, 운전자 쪽 면에 차체 색 띠 (레트로 대시)
+  const dw = innerLow(cb.front) * 2;
+  const dz = dashRear - cb.front;
+  const dzc = cb.front + dz / 2;
+  b.add(new THREE.BoxGeometry(dw, dashTop - floor, dz).translate(0, (dashTop + floor) / 2, dzc), DASH);
+  b.add(new THREE.BoxGeometry(dw, 0.02, dz).translate(0, dashTop + 0.01, dzc), DARK);
+  b.add(new THREE.BoxGeometry(dw, 0.05, 0.01).translate(0, dashTop - 0.17, dashRear + 0.005), paint);
+  // 계기판 통: 대시보드 위, 핸들 너머로 보이는 자리
+  b.add(new THREE.BoxGeometry(0.34, 0.12, 0.12).translate(eye.x, dashTop + 0.06, dashRear - 0.06), DARK);
+  b.add(new THREE.BoxGeometry(0.38, 0.02, 0.17).translate(eye.x, dashTop + 0.13, dashRear - 0.05), DARK);
+  // 다리 쪽 바닥: 차체 윗면이 안에서 비쳐 보이지 않게 덮는다
+  b.add(new THREE.BoxGeometry(dw, 0.02, seatZ + 0.7 - dashRear).translate(0, lap, (seatZ + 0.7 + dashRear) / 2), DASH);
+  // 핸들 기둥
+  const tilt = -0.45;
+  const axis = new THREE.Vector3(0, -Math.sin(tilt), Math.cos(tilt));
+  const hub = new THREE.Vector3(eye.x, wheelY, wheelZ);
+  beam(b, hub.clone().addScaledVector(axis, -0.03), hub.clone().addScaledVector(axis, -0.32), 0.035, DARK);
+
+  // A필러: 앞유리 양옆
+  const rf = cb.roofFront;
+  const roofY = roofAt(rf);
+  for (const sx of [-1, 1]) {
+    const a = new THREE.Vector3(sx * innerLow(cb.front), topAt(cb.front), cb.front);
+    const c = new THREE.Vector3(sx * innerTop(rf), roofY - 0.03, rf);
+    beam(b, a, c, 0.045, paint);
+  }
+
+  // 천장, 앞유리 위 테두리, 룸미러
+  const roofEnd = Math.min(cb.roofRear, seatZ + 0.8);
+  const rw = innerTop(rf) * 2;
+  b.add(new THREE.BoxGeometry(rw, 0.03, roofEnd - rf).translate(0, roofY - 0.04, (rf + roofEnd) / 2), TRIM);
+  b.add(new THREE.BoxGeometry(rw, 0.04, 0.06).translate(0, roofY - 0.06, rf + 0.02), paint);
+  // 룸미러는 앞유리에 바짝 붙여 단다 (눈에서 멀수록 작고 화면 안쪽에 보인다)
+  const mz = rf + ((cb.front - rf) * 0.12) / (roofY - topAt(cb.front)) + 0.05;
+  b.add(new THREE.CylinderGeometry(0.01, 0.01, 0.06, 5).translate(0, roofY - 0.08, mz), DARK);
+  b.add(new THREE.BoxGeometry(0.17, 0.05, 0.025).translate(0, roofY - 0.12, mz), DARK);
+  b.add(new THREE.BoxGeometry(0.145, 0.032, 0.005).translate(0, roofY - 0.12, mz + 0.014), spec.glass);
+
+  // 문 안쪽: 크림색 패널, 위 테두리는 차체 색, 팔걸이
+  const doorEnd = seatZ + 0.7;
+  const zc = (cb.front + doorEnd) / 2;
+  for (const sx of [-1, 1]) {
+    const x = sx * (innerLow(zc) - 0.03);
+    const top = topAt(zc) + 0.02;
+    b.add(new THREE.BoxGeometry(0.06, top - floor, doorEnd - cb.front).translate(x, (top + floor) / 2, zc), TRIM);
+    b.add(new THREE.BoxGeometry(0.09, 0.04, doorEnd - cb.front).translate(x, top, zc), paint);
+    b.add(new THREE.BoxGeometry(0.08, 0.04, 0.45).translate(x - sx * 0.05, top - 0.17, seatZ + 0.1), DASH);
+  }
+
+  const group = new THREE.Group();
+  group.visible = false;
+  // 실내는 조명 대신 면 방향에 따른 밝기를 색에 구워 넣는다. 천장처럼 아래를 보는 면이 땅 반사광(초록)에 물들지 않고,
+  // 밤낮 밝기는 재질 색 하나로 맞춘다.
+  const interior = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  group.add(new THREE.Mesh(bakeShade(b.build()), interior));
+
+  // 계기판 두 개와 가운데 화면
+  const d = new Builder();
+  for (const dx of [-0.08, 0.08]) {
+    d.add(new THREE.CylinderGeometry(0.044, 0.044, 0.01, 18).rotateX(Math.PI / 2).translate(eye.x + dx, dashTop + 0.06, dashRear + 0.002), '#f6efe0');
+    d.add(new THREE.BoxGeometry(0.006, 0.036, 0.004).translate(0, 0.014, 0).rotateZ(dx > 0 ? -0.9 : 0.6).translate(eye.x + dx, dashTop + 0.06, dashRear + 0.009), '#e0716a');
+  }
+  d.add(new THREE.BoxGeometry(0.24, 0.12, 0.01).translate(0.04, dashTop - 0.08, dashRear + 0.006), '#b9e4ee');
+  const dial = new THREE.MeshBasicMaterial({ vertexColors: true });
+  group.add(new THREE.Mesh(d.build(), dial));
+
+  // 핸들: 자기 축(z)으로 돌도록 기울인 받침 안에 넣는다
+  const s = new Builder(true);
+  s.add(new THREE.TorusGeometry(0.16, 0.021, 6, 24), DARK);
+  s.add(new THREE.CylinderGeometry(0.05, 0.055, 0.05, 10).rotateX(Math.PI / 2), '#4a4658');
+  s.add(new THREE.CylinderGeometry(0.025, 0.025, 0.06, 10).rotateX(Math.PI / 2), paint);
+  for (const sx of [-1, 1]) s.add(new THREE.BoxGeometry(0.12, 0.03, 0.02).translate(sx * 0.1, -0.01, 0), DARK);
+  s.add(new THREE.BoxGeometry(0.03, 0.11, 0.02).translate(0, -0.1, 0), DARK);
+  const steering = new THREE.Mesh(s.build(), new THREE.MeshLambertMaterial({ vertexColors: true }));
+  const mount = new THREE.Group();
+  mount.position.copy(hub);
+  mount.rotation.x = tilt;
+  mount.add(steering);
+  group.add(mount);
+
+  return { group, steering, eye, dial, interior, hidden: [] };
+}
+
+/** 면 방향에 따라 버텍스 색을 어둡게 한다: 위를 보는 면이 가장 밝고, 운전자 쪽(+z) 면이 그다음. */
+function bakeShade(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const n = g.attributes.normal;
+  const c = g.attributes.color;
+  for (let i = 0; i < c.count; i++) {
+    const k = THREE.MathUtils.clamp(0.84 + 0.14 * n.getY(i) + 0.08 * n.getZ(i), 0.7, 1);
+    c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k);
+  }
+  g.deleteAttribute('normal');
+  return g;
 }

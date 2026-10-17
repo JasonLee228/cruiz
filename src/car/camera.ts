@@ -6,6 +6,9 @@ type Mode = 'chase' | 'cockpit' | 'cinematic';
 const MODES: Mode[] = ['chase', 'cockpit', 'cinematic'];
 
 const BASE_FOV = 62;
+/** 운전석 뷰 시야각. 빠를수록 넓어져 속도감을 준다. */
+const COCKPIT_FOV = 66;
+const COCKPIT_FOV_GAIN = 14;
 
 /** 시네마틱 카메라가 가드레일 안쪽으로 남겨 두는 여유 (m) */
 const RAIL_MARGIN = 0.8;
@@ -36,6 +39,8 @@ export class CameraRig {
   private maxX = Infinity;
   private first = true;
   private target = new THREE.Vector3();
+  /** 운전석: 굽이 쪽으로 살짝 고개를 돌린 각도 */
+  private glance = 0;
 
   constructor() {
     this.camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth / window.innerHeight, 0.1, 1500);
@@ -48,44 +53,39 @@ export class CameraRig {
 
   update(dt: number, car: Car, elapsed: number): void {
     const p = car.object.position;
+    car.setCockpit(this.mode === 'cockpit');
 
     if (this.mode === 'cockpit') {
-      this.camYaw = car.yaw;
-      this.offset.set(-0.35, 1.35, 0.1);
-      this.lookOffset.set(0, 1.0, 30);
-    } else {
-      if (this.mode !== 'cinematic') {
-        this.minX = -Infinity;
-        this.maxX = Infinity;
-      }
-      this.yawTarget = this.mode === 'cinematic' ? car.yaw - car.heading : car.yaw;
-      if (this.mode === 'chase') {
-        // 속도감: 빠를수록 뒤로 물러나고(158km/h에서 약 18m) 시야각이 넓어진다.
-        this.desired.set(0, 3.0, -(7.5 + car.speed * 0.24));
-        this.desiredLook.set(0, 1.0, 8);
-      } else {
-        this.cinematic(dt, car, elapsed);
-      }
-      if (this.first) {
-        this.camYaw = this.yawTarget;
-        this.offset.copy(this.desired);
-        this.lookOffset.copy(this.desiredLook);
-      } else {
-        // 시네마틱은 도로 방향을 그대로 따른다. 늦게 돌면 굽이에서 옆 거리가 틀어져 가드레일 밖으로 나간다.
-        this.camYaw = this.mode === 'cinematic' ? this.yawTarget : THREE.MathUtils.damp(this.camYaw, this.yawTarget, 4, dt);
-        this.offset.lerp(this.desired, 1 - Math.exp(-dt * 4));
-        this.lookOffset.lerp(this.desiredLook, 1 - Math.exp(-dt * 8));
-      }
-      // 차가 옆으로 빠르게 움직여도 따라오는 카메라가 가드레일 밖으로 밀리지 않게
-      this.offset.x = THREE.MathUtils.clamp(this.offset.x, this.minX, this.maxX);
+      this.updateCockpit(dt, car, elapsed);
+      return;
     }
+    if (this.mode !== 'cinematic') {
+      this.minX = -Infinity;
+      this.maxX = Infinity;
+    }
+    this.yawTarget = this.mode === 'cinematic' ? car.yaw - car.heading : car.yaw;
+    if (this.mode === 'chase') {
+      // 속도감: 빠를수록 뒤로 물러나고(158km/h에서 약 18m) 시야각이 넓어진다.
+      this.desired.set(0, 3.0, -(7.5 + car.speed * 0.24));
+      this.desiredLook.set(0, 1.0, 8);
+    } else {
+      this.cinematic(dt, car, elapsed);
+    }
+    if (this.first) {
+      this.camYaw = this.yawTarget;
+      this.offset.copy(this.desired);
+      this.lookOffset.copy(this.desiredLook);
+    } else {
+      // 시네마틱은 도로 방향을 그대로 따른다. 늦게 돌면 굽이에서 옆 거리가 틀어져 가드레일 밖으로 나간다.
+      this.camYaw = this.mode === 'cinematic' ? this.yawTarget : THREE.MathUtils.damp(this.camYaw, this.yawTarget, 4, dt);
+      this.offset.lerp(this.desired, 1 - Math.exp(-dt * 4));
+      this.lookOffset.lerp(this.desiredLook, 1 - Math.exp(-dt * 8));
+    }
+    // 차가 옆으로 빠르게 움직여도 따라오는 카메라가 가드레일 밖으로 밀리지 않게
+    this.offset.x = THREE.MathUtils.clamp(this.offset.x, this.minX, this.maxX);
     this.first = false;
 
-    const fov = this.mode === 'chase' ? BASE_FOV + Math.min(car.speed / 44, 1) * 8 : BASE_FOV;
-    if (Math.abs(fov - this.camera.fov) > 0.01) {
-      this.camera.fov = THREE.MathUtils.damp(this.camera.fov, fov, 3, dt);
-      this.camera.updateProjectionMatrix();
-    }
+    this.setFov(this.mode === 'chase' ? BASE_FOV + Math.min(car.speed / 44, 1) * 8 : BASE_FOV, dt);
 
     // 차 기준 좌표 → 월드. 차의 전방 = (-sin, 0, -cos), 오른쪽 = (cos, 0, -sin)
     const sin = Math.sin(this.camYaw);
@@ -94,6 +94,36 @@ export class CameraRig {
     this.camera.position.set(p.x + cos * o.x - sin * o.z, p.y + o.y, p.z - sin * o.x - cos * o.z);
     const l = this.lookOffset;
     this.target.set(p.x + cos * l.x - sin * l.z, p.y + l.y, p.z - sin * l.x - cos * l.z);
+    this.camera.lookAt(this.target);
+  }
+
+  private setFov(fov: number, dt: number): void {
+    if (Math.abs(fov - this.camera.fov) < 0.01) return;
+    this.camera.fov = this.first ? fov : THREE.MathUtils.damp(this.camera.fov, fov, 3, dt);
+    this.camera.updateProjectionMatrix();
+  }
+
+  /**
+   * 운전석 1인칭 뷰. 눈은 차에 붙어 있어 언덕에서는 차와 함께 기울고, 굽이에서는 도는 쪽으로 살짝 고개를 돌린다.
+   * 빠를수록 시야각이 넓어지고 차가 잘게 떨려 속도감이 난다.
+   */
+  private updateCockpit(dt: number, car: Car, elapsed: number): void {
+    // 세로 화면은 가로 시야가 좁아 핸들만 보이므로 세로 시야각을 넓힌다.
+    const portrait = THREE.MathUtils.clamp((1.2 - this.camera.aspect) / 0.7, 0, 1);
+    const speedT = Math.min(car.speed / 44, 1);
+    this.setFov(COCKPIT_FOV + speedT * COCKPIT_FOV_GAIN + portrait * 12, dt);
+    this.glance = this.first ? 0 : THREE.MathUtils.damp(this.glance, car.wheelTurn * 0.12, 3, dt);
+    this.first = false;
+
+    const o = car.object;
+    o.updateMatrixWorld();
+    const e = car.cockpit.eye;
+    const shake = speedT * speedT * 0.004;
+    this.camera.position.set(e.x, e.y + Math.sin(elapsed * 37) * shake + Math.sin(elapsed * 23) * shake * 0.6, e.z);
+    // 차의 앞은 -z. 고개를 아주 조금 숙여 대시보드 너머 도로가 화면 가운데 오게 한다.
+    this.target.set(e.x + Math.sin(this.glance) * 10, e.y - 0.6 - portrait * 0.3, e.z - Math.cos(this.glance) * 10);
+    o.localToWorld(this.camera.position);
+    o.localToWorld(this.target);
     this.camera.lookAt(this.target);
   }
 

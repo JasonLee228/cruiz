@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RAIL_LATERAL, ROAD_HALF_WIDTH, roadDX, roadDY, roadX, roadY } from '../world/path';
 import type { InputState } from '../input';
-import { buildCar, getSpec, type CarModel, type CarSpec } from './models';
+import { buildCar, getSpec, type CarModel, type CarSpec, type Cockpit } from './models';
 
 const ACCEL = 7;
 const BRAKE = 12;
@@ -31,6 +31,11 @@ export class Car {
   private manual = false;
   /** 차 길이 (m). 카메라가 차를 화면에 담을 거리를 정할 때 쓴다. */
   length = 4.3;
+  /** 운전석 실내 (차종마다 다르다). 운전석 뷰의 눈 위치도 여기 있다. */
+  cockpit!: Cockpit;
+  /** 핸들이 돌아간 정도 (-1..1, +는 오른쪽). 굽이를 따라 도는 만큼도 들어간다. */
+  wheelTurn = 0;
+  private inCockpit = false;
 
   private wheels: THREE.Mesh[] = [];
   private wheelRadius = 0.38;
@@ -64,12 +69,27 @@ export class Car {
     this.wheelRadius = m.wheelRadius;
     this.headlight = m.headlight;
     this.tail = m.tail;
+    if (this.cockpit && this.cockpit !== m.cockpit) this.showCockpit(this.cockpit, false);
+    this.cockpit = m.cockpit;
+    this.showCockpit(m.cockpit, this.inCockpit);
     this.maxSpeed = spec.maxSpeed;
     this.halfWidth = spec.width / 2;
     this.length = spec.length;
     this.targetSpeed = Math.min(this.targetSpeed, this.maxSpeed);
     this.setNight(this.night);
     this.place();
+  }
+
+  /** 운전석 뷰에서는 실내를 보이고, 안에서 안 보이는 바퀴·후미등은 숨긴다. */
+  setCockpit(on: boolean): void {
+    if (on === this.inCockpit) return;
+    this.inCockpit = on;
+    this.showCockpit(this.cockpit, on);
+  }
+
+  private showCockpit(c: Cockpit, on: boolean): void {
+    c.group.visible = on;
+    for (const o of c.hidden) o.visible = !on;
   }
 
   get z(): number {
@@ -80,6 +100,9 @@ export class Car {
     this.night = amount;
     this.headlight.intensity = amount * 160;
     this.tail.color.setRGB(0.54 + amount * 0.46, 0.16 + amount * 0.1, 0.16 + amount * 0.1);
+    // 실내: 낮에는 제 색, 밤에는 푸르스름하게 어두워진다. 계기판은 밤에도 은은하게 보인다.
+    this.cockpit.interior.color.setRGB(1 - amount * 0.72, 1 - amount * 0.72, 1 - amount * 0.6);
+    this.cockpit.dial.color.setRGB(0.85 - amount * 0.25, 0.85 - amount * 0.2, 0.85 - amount * 0.12);
   }
 
   update(dt: number, input: InputState): void {
@@ -129,6 +152,14 @@ export class Car {
     const spin = (this.speed * dt) / this.wheelRadius;
     for (const w of this.wheels) w.rotation.x -= spin;
     this.wheels[0].rotation.y = this.wheels[1].rotation.y = -this.steer * 0.35;
+
+    if (this.inCockpit) {
+      // 핸들: 매뉴얼은 조향 그대로, 오토·어시스트는 도로가 휘는 만큼도 돌린다 (+곡률은 왼쪽).
+      const curve = manual ? 0 : (roadYaw(this.z - 3) - roadYaw(this.z + 3)) / 6;
+      const turn = THREE.MathUtils.clamp(this.steer * (manual ? 1 : 0.7) - curve * 30, -1, 1);
+      this.wheelTurn = THREE.MathUtils.damp(this.wheelTurn, turn, 6, dt);
+      this.cockpit.steering.rotation.z = -this.wheelTurn * 1.7;
+    }
   }
 
   private place(): void {

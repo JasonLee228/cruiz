@@ -10,6 +10,12 @@ const STEER_RATE = 0.55;
 const MANUAL_CURVATURE = 0.03;
 /** 매뉴얼: 도로 방향과 차 방향이 벌어질 수 있는 최대 각도 (rad) */
 const MAX_HEADING = 0.5;
+/** 오토: 두 차선의 중앙 (도로 중심에서 옆으로). +는 오른쪽 차선. */
+const LANE = 1.9;
+/** 오토: 차선을 옮기는 데 걸리는 시간 (s) */
+const LANE_CHANGE_TIME = 3.5;
+/** 오토: 이보다 느리면 차선을 바꾸지 않는다 (m/s) */
+const LANE_CHANGE_MIN_SPEED = 8;
 
 function roadYaw(z: number): number {
   return Math.atan(roadDX(z));
@@ -36,6 +42,9 @@ export class Car {
   /** 핸들이 돌아간 정도 (-1..1, +는 오른쪽). 굽이를 따라 도는 만큼도 들어간다. */
   wheelTurn = 0;
   private inCockpit = false;
+  /** 오토: 차선 변경. 지금 향하는 차선과, 옮겨 가는 경로(from → to, 진행도 t). */
+  private lane = { from: LANE, to: LANE, t: 1, wait: 0 };
+  private wasAuto = false;
 
   private wheels: THREE.Mesh[] = [];
   private wheelRadius = 0.38;
@@ -112,11 +121,9 @@ export class Car {
 
     const manual = (this.manual = input.mode === 'manual');
     let steerInput = input.steer;
-    if (input.mode === 'auto') {
-      // 자동 주행: 오른쪽 차선 중앙을 유지
-      const error = 1.9 - this.lateral;
-      steerInput = THREE.MathUtils.clamp(error * 0.8, -1, 1);
-    }
+    const auto = input.mode === 'auto';
+    if (auto) steerInput = this.autoSteer(dt, !this.wasAuto);
+    this.wasAuto = auto;
     this.steer = THREE.MathUtils.damp(this.steer, steerInput, 8, dt);
 
     const offRoad = Math.abs(this.lateral) > ROAD_HALF_WIDTH - 0.8;
@@ -160,6 +167,38 @@ export class Car {
       this.wheelTurn = THREE.MathUtils.damp(this.wheelTurn, turn, 6, dt);
       this.cockpit.steering.rotation.z = -this.wheelTurn * 1.7;
     }
+  }
+
+  /**
+   * 자동 주행: 차선 중앙을 따라가다가 가끔 옆 차선으로 부드럽게 옮긴다.
+   * 왼쪽 차선에는 오래 머물지 않고 추월하듯 다시 오른쪽으로 돌아온다.
+   */
+  private autoSteer(dt: number, entered: boolean): number {
+    const lane = this.lane;
+    if (entered) {
+      // 다른 모드에서 넘어오면 가까운 차선으로 천천히 들어간다.
+      lane.from = this.lateral;
+      lane.to = this.lateral < 0 ? -LANE : LANE;
+      lane.t = 0;
+      lane.wait = 8 + Math.random() * 12;
+    }
+    if (lane.t >= 1) {
+      lane.wait -= dt;
+      if (lane.wait <= 0 && this.speed > LANE_CHANGE_MIN_SPEED) {
+        lane.from = lane.to;
+        lane.to = -lane.to;
+        lane.t = 0;
+        // 오른쪽 차선에서는 12~35초, 왼쪽 차선에서는 5~12초 머문다.
+        lane.wait = lane.to > 0 ? 12 + Math.random() * 23 : 5 + Math.random() * 7;
+      }
+    }
+    lane.t = Math.min(1, lane.t + dt / LANE_CHANGE_TIME);
+    const e = lane.t * lane.t * (3 - 2 * lane.t);
+    const target = lane.from + (lane.to - lane.from) * e;
+    // 목표가 옮겨 가는 속도만큼 미리 핸들을 돌리고(앞먹임), 남은 오차는 비례 제어로 메운다.
+    const rate = ((lane.to - lane.from) * 6 * lane.t * (1 - lane.t)) / LANE_CHANGE_TIME;
+    const gain = STEER_RATE * Math.max(Math.min(this.speed, 20), 1) * 0.35;
+    return THREE.MathUtils.clamp(rate / gain + (target - this.lateral) * 0.8, -1, 1);
   }
 
   private place(): void {

@@ -119,11 +119,12 @@ export class CameraRig {
     o.updateMatrixWorld();
     const e = car.cockpit.eye;
     const shake = speedT * speedT * 0.004;
-    // 세로 화면은 가로 시야가 좁으므로 눈을 뒤로 물려 앞유리와 실내가 더 많이 들어오게 한다.
-    const back = portrait * Math.min(0.45, car.cockpit.maxBack);
+    // 눈을 시트 등받이 쪽으로 조금 물려 핸들 아래 발밑까지 보이게 한다.
+    // 세로 화면은 가로 시야가 좁으므로 더 물려 앞유리와 실내가 더 많이 들어오게 한다.
+    const back = Math.min(0.25 + portrait * 0.2, car.cockpit.maxBack);
     this.camera.position.set(e.x, e.y + Math.sin(elapsed * 37) * shake + Math.sin(elapsed * 23) * shake * 0.6, e.z + back);
     // 차의 앞은 -z. 고개를 아주 조금 숙여 대시보드 너머 도로가 화면 가운데 오게 한다.
-    this.target.set(e.x + Math.sin(this.glance) * 10, e.y - 1.3, e.z + back - Math.cos(this.glance) * 10);
+    this.target.set(e.x + Math.sin(this.glance) * 10, e.y - 2.7, e.z + back - Math.cos(this.glance) * 10);
     o.localToWorld(this.camera.position);
     o.localToWorld(this.target);
     this.camera.lookAt(this.target);
